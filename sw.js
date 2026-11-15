@@ -5,6 +5,7 @@ const ASSETS_TO_CACHE = [
     '/styles.css',
     '/suite.js',
     '/manifest.json',
+    '/icon.svg',
     '/upartrivia/index.html',
     '/upartrivia/styles.css',
     '/upartrivia/app.js',
