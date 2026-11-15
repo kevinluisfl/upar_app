@@ -35,10 +35,11 @@
     <header class="suite-topbar">
         <div class="topbar-inner">
 
-            <!-- Identidad de Marca Dinámica (Cambia según la App activa) -->
+<!-- Identidad de Marca Dinámica (Cambia según la App activa) -->
             <div class="suite-brand" onclick="openSuiteApp('dashboard')" title="Volver al Panel Principal">
-                <div id="suiteBrandLogo" class="suite-logo bg-grad-indigo">
-                    <i id="suiteBrandIcon" class="fa-solid fa-cubes"></i>
+                <div id="suiteBrandLogo" class="suite-logo" style="overflow: hidden; padding: 0;">
+                    <img id="suiteBrandCustomSvg" src="/icon.svg" alt="UparApp" style="width: 100%; height: 100%; object-fit: cover; border-radius: inherit; display: block;">
+                    <i id="suiteBrandIcon" class="fa-solid fa-cubes" style="display: none;"></i>
                 </div>
                 <div class="suite-brand-text">
                     <div class="suite-title-row">

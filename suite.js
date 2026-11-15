@@ -160,17 +160,25 @@ function st(key) {
    -------------------------------------------------------------------------- */
 function updateTopBarBrandIdentity() {
     const profile = BRAND_PROFILES[suiteState.activeApp] || BRAND_PROFILES.dashboard;
+    const isDashboard = suiteState.activeApp === 'dashboard';
 
     const logoEl = document.getElementById('suiteBrandLogo');
     const iconEl = document.getElementById('suiteBrandIcon');
+    const customSvgEl = document.getElementById('suiteBrandCustomSvg');
     const titleEl = document.getElementById('suiteBrandTitle');
     const badgeEl = document.getElementById('uiSuiteBadge');
     const subEl = document.getElementById('uiSuiteSubtitle');
 
     if (logoEl) {
-        logoEl.className = `suite-logo ${profile.logoGrad}`;
+        logoEl.className = isDashboard ? 'suite-logo' : `suite-logo ${profile.logoGrad}`;
+        logoEl.style.padding = isDashboard ? '0' : '';
+        logoEl.style.overflow = 'hidden';
+    }
+    if (customSvgEl) {
+        customSvgEl.style.display = isDashboard ? 'block' : 'none';
     }
     if (iconEl) {
+        iconEl.style.display = isDashboard ? 'none' : '';
         iconEl.className = profile.icon;
     }
     if (titleEl) {
