@@ -2042,6 +2042,7 @@ function loadNextGameQuestion() {
         const txt = document.getElementById(`ansText${idx}`);
         btn.className = 'answer-option';
         btn.disabled = false;
+        btn.blur(); // <-- Quita la selección pegada en móvil al pasar de pregunta
         txt.textContent = opt.text;
     });
 
@@ -2349,6 +2350,35 @@ function clearRankingHistory() {
     });
 }
 
+function toggleTriviaFocusMode() {
+    const isFocus = document.body.classList.toggle('focus-mode');
+    const icon = document.getElementById('focusTriviaIcon');
+    const label = document.getElementById('uiBtnFocusTrivia');
+
+    if (icon) icon.className = isFocus ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
+    if (label) {
+        label.textContent = isFocus
+            ? (appState.lang === 'en' ? 'Exit Focus' : 'Salir')
+            : (appState.lang === 'en' ? 'Focus' : 'Concentración');
+    }
+
+    if (isFocus && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+    } else if (!isFocus && document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+    }
+}
+
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && document.body.classList.contains('focus-mode')) {
+        document.body.classList.remove('focus-mode');
+        const icon = document.getElementById('focusTriviaIcon');
+        const label = document.getElementById('uiBtnFocusTrivia');
+        if (icon) icon.className = 'fa-solid fa-expand';
+        if (label) label.textContent = appState.lang === 'en' ? 'Focus' : 'Concentración';
+    }
+});
+
 /* --------------------------------------------------------------------------
    11. EXPOSICIÓN EXPLÍCITA AL ÁMBITO GLOBAL (WINDOW) Y ARRANQUE
    -------------------------------------------------------------------------- */
@@ -2384,7 +2414,8 @@ Object.assign(window, {
     exportSingleBankJSON,
     deleteBank,
     renderRankingTable,
-    clearRankingHistory
+    clearRankingHistory,
+    toggleTriviaFocusMode
 });
 
 window.addEventListener('DOMContentLoaded', () => {
