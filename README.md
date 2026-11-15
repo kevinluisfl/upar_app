@@ -74,6 +74,8 @@ Selector aleatorio interactivo para sorteos, participación de estudiantes y asi
     ├── index.html
     ├── styles.css
     └── app.js
+```
+---
 
 ## 🚀 Instalación y Uso
 
