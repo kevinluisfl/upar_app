@@ -1,0 +1,708 @@
+/* ==========================================================================
+   1. VARIABLES DE DISEÑO INDIGO STUDIO (CLARO Y OSCURO)
+   ========================================================================== */
+:root {
+    --bg: #f8fafc;
+    --header-bg: #ffffff;
+    --card: #ffffff;
+    --card-inner: #f1f5f9;
+    --accent: #4f46e5;
+    --accent-light: #6366f1;
+    --accent-soft: #eef2ff;
+    --accent-border: #c7d2fe;
+    --text: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --emerald: #10b981;
+    --amber: #f59e0b;
+    --rose: #e11d48;
+    /* --blue: #0ea5e9; */
+    --blue: #026ec7;
+    --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+    --shadow-md: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+    --shadow-lg: 0 20px 35px -10px rgba(15, 23, 42, 0.16);
+}
+
+html.dark {
+    --bg: #020617;
+    --header-bg: #0f172a;
+    --card: #0f172a;
+    --card-inner: #1e293b;
+    --accent: #6366f1;
+    --accent-light: #818cf8;
+    --accent-soft: rgba(99, 102, 241, 0.15);
+    --accent-border: rgba(99, 102, 241, 0.35);
+    --text: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --border: #1e293b;
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.35);
+    --shadow-md: 0 12px 28px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 24px 48px rgba(0, 0, 0, 0.7);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* IMPORTANTE: Sin height: 100% fijo en html/body para que el footer nunca flote a mitad de pantalla al hacer scroll */
+body {
+    background-color: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    transition: background-color 0.2s, color 0.2s;
+    overflow-x: hidden;
+}
+
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+.text-indigo { color: var(--accent-light); }
+.text-emerald { color: var(--emerald); }
+.text-amber { color: var(--amber); }
+.text-rose { color: var(--rose); }
+.text-blue { color: var(--blue); }
+.hidden { display: none !important; }
+
+/* ==========================================================================
+   2. TOP BAR MAESTRA DE UPARAPP STUDIO (MARCA DINÁMICA Y COLORES POR APP)
+   ========================================================================== */
+.suite-topbar {
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    height: 58px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+
+.topbar-inner {
+    max-width: 1440px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+}
+
+.suite-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+    min-width: 185px;
+}
+
+.suite-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 0.7rem;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.suite-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.suite-brand h1 {
+    font-size: 1.08rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+}
+
+.suite-brand p {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.suite-badge {
+    font-size: 0.6rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.12rem 0.48rem;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.badge-indigo {
+    background: var(--accent-soft);
+    color: var(--accent-light);
+    border-color: var(--accent-border);
+}
+.badge-emerald {
+    background: rgba(16, 185, 129, 0.14);
+    color: var(--emerald);
+    border-color: rgba(16, 185, 129, 0.35);
+}
+.badge-amber {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--amber);
+    border-color: rgba(245, 158, 11, 0.38);
+}
+.badge-rose {
+    background: rgba(225, 29, 72, 0.14);
+    color: var(--rose);
+    border-color: rgba(225, 29, 72, 0.35);
+}
+.badge-blue {
+    background: rgba(14, 165, 233, 0.14);
+    color: var(--blue);
+    border-color: rgba(14, 165, 233, 0.35);
+}
+
+/* Botones de Navegación Central con color personalizado por aplicación */
+.suite-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.22rem;
+    background: var(--card-inner);
+    padding: 0.25rem;
+    border-radius: 0.8rem;
+    border: 1px solid var(--border);
+}
+
+.suite-nav-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    padding: 0.42rem 0.8rem;
+    border-radius: 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.42rem;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.suite-nav-btn i {
+    font-size: 0.9rem;
+    transition: color 0.15s ease;
+}
+
+/* Color de icono sutil en hover según la app */
+.suite-nav-btn[data-app="dashboard"]:hover { color: var(--accent-light); }
+.suite-nav-btn[data-app="uparpuzzle"]:hover { color: var(--blue); }
+.suite-nav-btn[data-app="uparwheel"]:hover { color: var(--emerald); }
+.suite-nav-btn[data-app="upartrivia"]:hover { color: var(--amber); }
+.suite-nav-btn[data-app="upargrade"]:hover { color: var(--rose); }
+
+/* Estado activo con el color propio de cada app */
+.suite-nav-btn.active[data-app="dashboard"] {
+    background: var(--card);
+    color: var(--accent-light);
+    border-color: var(--accent-border);
+    box-shadow: var(--shadow-sm);
+}
+
+.suite-nav-btn.active[data-app="uparpuzzle"] {
+    background: var(--card);
+    color: var(--blue);
+    border-color: rgba(14, 165, 233, 0.4);
+    box-shadow: 0 2px 8px rgba(14, 165, 233, 0.15);
+}
+
+.suite-nav-btn.active[data-app="uparwheel"] {
+    background: var(--card);
+    color: var(--emerald);
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+}
+
+.suite-nav-btn.active[data-app="upartrivia"] {
+    background: var(--card);
+    color: var(--amber);
+    border-color: rgba(245, 158, 11, 0.45);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+}
+
+.suite-nav-btn.active[data-app="upargrade"] {
+    background: var(--card);
+    color: var(--rose);
+    border-color: rgba(225, 29, 72, 0.4);
+    box-shadow: 0 2px 8px rgba(225, 29, 72, 0.15);
+}
+
+/* Acciones derechas de la Top Bar */
+.suite-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-shrink: 0;
+}
+
+.btn-suite-util {
+    background: var(--card);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    padding: 0.42rem 0.7rem;
+    border-radius: 0.65rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    transition: all 0.15s;
+}
+
+.btn-suite-util:hover {
+    border-color: var(--accent-light);
+    color: var(--text);
+}
+
+.btn-icon {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+}
+
+/* ==========================================================================
+   3. DASHBOARD PRINCIPAL Y TARJETAS DE LAS 4 APLICACIONES
+   ========================================================================== */
+.suite-workspace {
+    flex: 1 0 auto;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.suite-view {
+    display: none;
+    width: 100%;
+}
+
+#viewDashboard.suite-view.active {
+    display: block;
+    flex: 1 0 auto;
+    animation: fadeIn 0.18s ease-out;
+}
+
+/* Vista de Iframe a Pantalla Completa Real */
+.app-frame-view.suite-view.active {
+    display: block;
+    width: 100%;
+    height: calc(100vh - 58px);
+}
+
+.app-frame-view iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+    background: var(--bg);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(3px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.dashboard-wrapper {
+    max-width: 1280px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 1.6rem 1.25rem 2.25rem 1.25rem;
+}
+
+.hero-banner {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 1.35rem;
+    padding: 1.6rem 1.85rem;
+    margin-bottom: 1.6rem;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-banner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 6px;
+    height: 100%;
+    background: linear-gradient(180deg, #4f46e5, #7c3aed);
+}
+
+.hero-text {
+    max-width: 680px;
+}
+
+.hero-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent-light);
+    margin-bottom: 0.4rem;
+}
+
+.hero-text h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.4rem;
+}
+
+.hero-text p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.hero-quick-stats {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.65rem;
+}
+
+.hero-stat-pill {
+    background: var(--card-inner);
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.95rem;
+    border-radius: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.hero-stat-pill strong {
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.hero-stat-btns {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-hero-action {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: #ffffff;
+    border: none;
+    padding: 0.52rem 0.95rem;
+    border-radius: 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+
+.btn-hero-outline {
+    background: var(--card-inner);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 0.52rem 0.95rem;
+    border-radius: 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* Cuadrícula de las 4 Tarjetas */
+.apps-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+}
+
+.app-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 1.25rem;
+    padding: 1.45rem;
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    position: relative;
+    z-index: 1;
+}
+
+.app-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.card-hover-indigo:hover { border-color: var(--accent-light); }
+.card-hover-emerald:hover { border-color: var(--emerald); }
+.card-hover-amber:hover { border-color: var(--amber); }
+.card-hover-rose:hover { border-color: var(--rose); }
+.card-hover-blue:hover { border-color: var(--blue); }
+
+.app-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.9rem;
+}
+
+.app-card-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 0.85rem;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+}
+
+.bg-grad-indigo { background: linear-gradient(135deg, #5b46e5, #7c3aed); box-shadow: 0 6px 16px rgba(79, 70, 229, 0.28); }
+.bg-grad-emerald { background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 6px 16px rgba(16, 185, 129, 0.28); }
+.bg-grad-amber { background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 6px 16px rgba(245, 158, 11, 0.28); }
+.bg-grad-rose { background: linear-gradient(135deg, #e11d48, #be123c); box-shadow: 0 6px 16px rgba(225, 29, 72, 0.28); }
+.bg-grad-blue { background: linear-gradient(135deg, #0284c7, #2563eb); box-shadow: 0 6px 16px rgba(2, 132, 199, 0.28); }
+
+.app-tag {
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-light);
+}
+
+.tag-emerald { background: rgba(16, 185, 129, 0.12); color: var(--emerald); }
+.tag-amber { background: rgba(245, 158, 11, 0.14); color: var(--amber); }
+.tag-rose { background: rgba(225, 29, 72, 0.12); color: var(--rose); }
+.tag-blue { background: rgba(14, 165, 233, 0.14); color: var(--blue); }
+
+.app-card h3 {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.4rem;
+}
+
+.app-card p {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 1.1rem;
+    flex: 1;
+}
+
+.app-card-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.metric-chip {
+    background: var(--card-inner);
+    border: 1px solid var(--border);
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.app-card-footer {
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    font-weight: 800;
+}
+
+/* ==========================================================================
+   4. MODAL DE RESPALDO, TOAST Y PIE DE PÁGINA FIJO AL FONDO DEL DOCUMENTO
+   ========================================================================== */
+.suite-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.suite-modal-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 1.3rem;
+    padding: 1.75rem;
+    max-width: 460px;
+    width: 100%;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+}
+
+.suite-modal-icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    margin: 0 auto 0.85rem;
+    background: var(--accent-soft);
+    color: var(--accent-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+}
+
+.suite-modal-card h3 {
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+}
+
+.suite-modal-card p {
+    font-size: 0.83rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 1.25rem;
+}
+
+.suite-modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    justify-content: center;
+}
+
+.suite-toast-container {
+    position: fixed;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.suite-toast {
+    background: #0f172a;
+    color: #fff;
+    padding: 0.75rem 1rem;
+    border-radius: 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.suite-footer {
+    flex-shrink: 0;
+    width: 100%;
+    padding: 1rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    background: var(--header-bg);
+    position: relative;
+    z-index: 10;
+}
+
+.suite-footer a {
+    color: var(--accent-light);
+    text-decoration: none;
+    font-weight: 700;
+}
+
+/* ==========================================================================
+   5. RESPONSIVE DESIGN PROGRESIVO (REDUCCIÓN A ICONOS EN PANTALLA PEQUEÑA)
+   ========================================================================== */
+@media (max-width: 1120px) {
+    .hide-lg {
+        display: none !important;
+    }
+    .suite-brand {
+        min-width: auto;
+    }
+}
+
+@media (max-width: 960px) {
+    .hide-md {
+        display: none !important;
+    }
+    .apps-cards-grid {
+        grid-template-columns: 1fr;
+    }
+    .suite-nav-btn {
+        padding: 0.4rem 0.65rem;
+        font-size: 0.74rem;
+    }
+}
+
+@media (max-width: 760px) {
+    .suite-nav-btn .nav-label {
+        display: none !important;
+    }
+    .suite-nav-btn {
+        width: 38px;
+        height: 34px;
+        padding: 0;
+    }
+    .suite-nav-btn i {
+        font-size: 1rem;
+    }
+    .suite-brand h1 {
+        font-size: 0.96rem;
+    }
+    .hero-quick-stats {
+        align-items: flex-start;
+        width: 100%;
+    }
+}

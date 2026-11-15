@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es" class="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UparApp Studio — Suite Interactiva Docente</title>
+
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Estilos del Hub Maestro -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <!-- Contenedor de Notificaciones Toast -->
+    <div id="suiteToastContainer" class="suite-toast-container"></div>
+
+    <!-- ==================== TOP BAR MAESTRA DE UPARAPP STUDIO ==================== -->
+    <header class="suite-topbar">
+        <div class="topbar-inner">
+
+            <!-- Identidad de Marca Dinámica (Cambia según la App activa) -->
+            <div class="suite-brand" onclick="openSuiteApp('dashboard')" title="Volver al Panel Principal">
+                <div id="suiteBrandLogo" class="suite-logo bg-grad-indigo">
+                    <i id="suiteBrandIcon" class="fa-solid fa-cubes"></i>
+                </div>
+                <div class="suite-brand-text">
+                    <div class="suite-title-row">
+                        <h1 id="suiteBrandTitle">Upar<span class="text-indigo">App</span></h1>
+                        <span id="uiSuiteBadge" class="suite-badge badge-indigo hide-md">Suite 4 en 1</span>
+                    </div>
+                    <p id="uiSuiteSubtitle" class="hide-lg">Ecosistema interactivo de herramientas para el aula</p>
+                </div>
+            </div>
+
+            <!-- Menú Superior de Acceso Rápido (Cada botón con su color propio al seleccionarse) -->
+            <nav class="suite-nav" id="suiteTopNav">
+                <button class="suite-nav-btn active" data-app="dashboard" onclick="openSuiteApp('dashboard')" title="Inicio">
+                    <i class="fa-solid fa-table-columns"></i>
+                    <span id="uiNavHome" class="nav-label">Inicio</span>
+                </button>
+                <button class="suite-nav-btn" data-app="upartrivia" onclick="openSuiteApp('upartrivia')" title="UparTrivia">
+                    <i class="fa-solid fa-brain"></i>
+                    <span class="nav-label">UparTrivia</span>
+                </button>
+                <button class="suite-nav-btn" data-app="uparpuzzle" onclick="openSuiteApp('uparpuzzle')" title="UparPuzzle">
+                    <i class="fa-solid fa-puzzle-piece"></i>
+                    <span class="nav-label">UparPuzzle</span>
+                </button>
+                <button class="suite-nav-btn" data-app="upargrade" onclick="openSuiteApp('upargrade')" title="UparGrade">
+                    <i class="fa-solid fa-qrcode"></i>
+                    <span class="nav-label">UparGrade</span>
+                </button>
+                <button class="suite-nav-btn" data-app="uparwheel" onclick="openSuiteApp('uparwheel')" title="UparWheel">
+                    <i class="fa-solid fa-dharmachakra"></i>
+                    <span class="nav-label">UparWheel</span>
+                </button>
+            </nav>
+
+            <!-- Utilidades Globales Sincronizadas -->
+            <div class="suite-actions">
+                <!-- Idioma Global ES / EN -->
+                <button id="btnSuiteLang" class="btn-suite-util" onclick="toggleSuiteLang()" title="Cambiar Idioma Global / Switch Global Language">
+                    <i class="fa-solid fa-globe text-indigo"></i>
+                    <span id="suiteLangLabel">ES</span>
+                </button>
+
+                <!-- Tema Global Claro / Oscuro -->
+                <button id="btnSuiteTheme" class="btn-suite-util btn-icon" onclick="toggleSuiteTheme()" title="Cambiar Tema Global Claro / Oscuro">
+                    <i id="suiteThemeIcon" class="fa-solid fa-moon text-indigo"></i>
+                </button>
+
+                <!-- Respaldo Maestro Unificado JSON -->
+                <button class="btn-suite-util" onclick="openBackupModal()" title="Respaldo Maestro de las 4 Apps">
+                    <i class="fa-solid fa-database text-indigo"></i>
+                    <span id="uiBtnMasterBackup" class="hide-md">Respaldo</span>
+                </button>
+
+                <!-- Pantalla Completa Global -->
+                <button id="btnSuiteFullscreen" class="btn-suite-util btn-icon" onclick="toggleSuiteFullscreen()" title="Pantalla Completa">
+                    <i id="suiteFsIcon" class="fa-solid fa-expand text-indigo"></i>
+                </button>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- ==================== ÁREA DE TRABAJO PRINCIPAL ==================== -->
+    <main class="suite-workspace">
+
+        <!-- =====================================================================
+             VISTA 0: DASHBOARD PRINCIPAL (TARJETAS DE LAS 4 HERRAMIENTAS)
+             ===================================================================== -->
+        <section id="viewDashboard" class="suite-view active">
+            <div class="dashboard-wrapper">
+
+                <!-- Banner Hero de Bienvenida -->
+                <div class="hero-banner">
+                    <div class="hero-text">
+                        <span class="hero-kicker" id="uiHeroKicker"><i class="fa-solid fa-wand-magic-sparkles"></i> UparSoft Educación Digital</span>
+                        <h2 id="uiHeroTitle">Bienvenido a UparApp Studio</h2>
+                        <p id="uiHeroDesc">
+                            Selecciona cualquiera de las 4 herramientas pedagógicas interactivas. Todos tus datos, temas visuales e idioma están sincronizados automáticamente en un solo lugar.
+                        </p>
+                    </div>
+
+                    <div class="hero-quick-stats">
+                        <div class="hero-stat-pill">
+                            <span id="uiStatTotalSaved">Registros Guardados</span>
+                            <strong id="totalSuiteItemsCount" class="font-mono text-indigo">0</strong>
+                        </div>
+                        <div class="hero-stat-btns">
+                            <button class="btn-hero-action" onclick="exportMasterBackupJSON()">
+                                <i class="fa-solid fa-file-export"></i> <span id="uiBtnHeroExport">Exportar Todo</span>
+                            </button>
+                            <button class="btn-hero-outline" onclick="document.getElementById('masterImportInput').click()">
+                                <i class="fa-solid fa-file-import"></i> <span id="uiBtnHeroImport">Importar Todo</span>
+                            </button>
+                            <input type="file" id="masterImportInput" accept=".json" class="hidden" onchange="handleMasterImportJSON(event)">
+                        </div>
+                    </div>
+                </div>
+
+               <!-- Cuadrícula de Tarjetas de las 4 Aplicaciones (Orden: Trivia, Puzzle, Grade, Wheel) -->
+                <div class="apps-cards-grid">
+
+                    <!-- TARJETA 1: UPARTRIVIA (Ámbar) -->
+                    <article class="app-card card-hover-amber" onclick="openSuiteApp('upartrivia')">
+                        <div class="app-card-top">
+                            <div class="app-card-icon bg-grad-amber">
+                                <i class="fa-solid fa-brain"></i>
+                            </div>
+                            <span class="app-tag tag-amber" id="uiTagTrivia">Edición Millonario</span>
+                        </div>
+                        <h3>Upar<span class="text-amber">Trivia</span></h3>
+                        <p id="uiDescTrivia">
+                            Competencia escolar por niveles estilo "¿Quién quiere ser millonario?" con 3 comodines, perfiles docentes, carga masiva (Excel/Texto/JSON), rondas a medida y ranking.
+                        </p>
+                        <div class="app-card-metrics">
+                            <div class="metric-chip">
+                                <i class="fa-solid fa-database text-amber"></i>
+                                <span id="metricTriviaBanks">0 bancos de preguntas</span>
+                            </div>
+                            <div class="metric-chip">
+                                <i class="fa-solid fa-trophy text-indigo"></i>
+                                <span id="metricTriviaScores">0 récords en ranking</span>
+                            </div>
+                        </div>
+                        <div class="app-card-footer text-amber">
+                            <span class="btn-launch-text" id="uiLaunchTrivia">Abrir UparTrivia</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </div>
+                    </article>
+
+                    <!-- TARJETA 2: UPARPUZZLE (Azul) -->
+                    <article class="app-card card-hover-blue" onclick="openSuiteApp('uparpuzzle')">
+                        <div class="app-card-top">
+                            <div class="app-card-icon bg-grad-blue">
+                                <i class="fa-solid fa-puzzle-piece"></i>
+                            </div>
+                            <span class="app-tag tag-blue" id="uiTagPuzzle">Pasatiempos Didácticos</span>
+                        </div>
+                        <h3>Upar<span class="text-blue">Puzzle</span></h3>
+                        <p id="uiDescPuzzle">
+                            Generador algorítmico interactivo de Sopas de Letras (con fusión multicolor en cruces) y Crucigramas inteligentes listos para proyectar o imprimir en PDF/PNG.
+                        </p>
+                        <div class="app-card-metrics">
+                            <div class="metric-chip">
+                                <i class="fa-solid fa-folder-bookmark text-blue"></i>
+                                <span id="metricPuzzleSaved">0 actividades guardadas</span>
+                            </div>
+                            <div class="metric-chip">
+                                <i class="fa-solid fa-print text-emerald"></i>
+                                <span id="uiBadgePuzzlePrint">Impresión A4 & PNG</span>
+                            </div>
+                        </div>
+                        <div class="app-card-footer text-blue">
+                            <span class="btn-launch-text" id="uiLaunchPuzzle">Abrir UparPuzzle</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </div>
+                    </article>
+
+                    <!-- TARJETA 3: UPARGRADE (Rojo/Rosa) -->
+                    <article class="app-card card-hover-rose" onclick="openSuiteApp('upargrade')">
+                        <div class="app-card-top">
+                            <div class="app-card-icon bg-grad-rose">
+                                <i class="fa-solid fa-qrcode"></i>
+                            </div>
+                            <span class="app-tag tag-rose" id="uiTagGrade">Evaluación ICFES OMR</span>
+                        </div>
+                        <h3>Upar<span class="text-rose">Grade</span></h3>
+                        <p id="uiDescGrade">
+                            Diseñador de exámenes, generador de hojas de respuesta tipo ICFES (completas o simplificadas hasta 6 por página) y escáner óptico OMR por cámara o fotografía.
+                        </p>
+                        <div class="app-card-metrics">
+                            <div class="metric-chip">
+                                <i class="fa-solid fa-file-signature text-rose"></i>
+                                <span id="metricGradeExams">0 exámenes creados</span>
+                            </div>
+                            <div class="metric-chip">
+                                <i class="fa-solid fa-check-double text-emerald"></i>
+                                <span id="metricGradeResults">0 hojas calificadas</span>
+                            </div>
+                        </div>
+                        <div class="app-card-footer text-rose">
+                            <span class="btn-launch-text" id="uiLaunchGrade">Abrir UparGrade</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </div>
+                    </article>
+
+                    <!-- TARJETA 4: UPARWHEEL (Esmeralda) -->
+                    <article class="app-card card-hover-emerald" onclick="openSuiteApp('uparwheel')">
+                        <div class="app-card-top">
+                            <div class="app-card-icon bg-grad-emerald">
+                                <i class="fa-solid fa-dharmachakra"></i>
+                            </div>
+                            <span class="app-tag tag-emerald" id="uiTagWheel">Participación en Aula</span>
+                        </div>
+                        <h3>Upar<span class="text-emerald">Wheel</span></h3>
+                        <p id="uiDescWheel">
+                            Doble ruleta aleatoria sincronizada para selección de estudiantes y asignación de temas, con limpiador inteligente de listas de plataforma, voz y sonido real.
+                        </p>
+                        <div class="app-card-metrics">
+                            <div class="metric-chip">
+                                <i class="fa-solid fa-users text-emerald"></i>
+                                <span id="metricWheelCount">0 elementos en ruletas</span>
+                            </div>
+                            <div class="metric-chip">
+                                <i class="fa-solid fa-volume-high text-indigo"></i>
+                                <span id="uiBadgeWheelVoice">Narrador por Voz</span>
+                            </div>
+                        </div>
+                        <div class="app-card-footer text-emerald">
+                            <span class="btn-launch-text" id="uiLaunchWheel">Abrir UparWheel</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </div>
+                    </article>
+
+                </div>
+
+            </div>
+        </section>
+
+        <!-- =====================================================================
+             VISTAS EMBEBIDAS DE LAS 4 APLICACIONES
+             ===================================================================== -->
+        <section id="viewApp_uparpuzzle" class="suite-view app-frame-view">
+            <iframe id="frame_uparpuzzle" data-src="./uparpuzzle/index.html" title="UparPuzzle"></iframe>
+        </section>
+
+        <section id="viewApp_uparwheel" class="suite-view app-frame-view">
+            <iframe id="frame_uparwheel" data-src="./uparwheel/index.html" title="UparWheel"></iframe>
+        </section>
+
+        <section id="viewApp_upartrivia" class="suite-view app-frame-view">
+            <iframe id="frame_upartrivia" data-src="./upartrivia/index.html" title="UparTrivia"></iframe>
+        </section>
+
+        <section id="viewApp_upargrade" class="suite-view app-frame-view">
+            <iframe id="frame_upargrade" data-src="./upargrade/index.html" title="UparGrade"></iframe>
+        </section>
+
+    </main>
+
+    <!-- ==================== MODAL DE RESPALDO MAESTRO UNIFICADO ==================== -->
+    <div id="backupModalOverlay" class="suite-modal-overlay hidden">
+        <div class="suite-modal-card">
+            <div class="suite-modal-icon">
+                <i class="fa-solid fa-database"></i>
+            </div>
+            <h3 id="uiModalBackupTitle">Respaldo Maestro de UparApp Studio</h3>
+            <p id="uiModalBackupDesc">
+                Exporta o importa en un único archivo <code>.json</code> todos los datos guardados en las 4 aplicaciones (crucigramas, listas de ruletas, bancos/rankings de trivia y exámenes/notas de UparGrade).
+            </p>
+            <div class="suite-modal-actions">
+                <button class="btn-hero-action" onclick="exportMasterBackupJSON()">
+                    <i class="fa-solid fa-download"></i> <span id="uiModalBtnExport">Descargar Respaldo (.json)</span>
+                </button>
+                <button class="btn-suite-util" onclick="document.getElementById('masterImportInput').click()">
+                    <i class="fa-solid fa-upload text-indigo"></i> <span id="uiModalBtnImport">Cargar Archivo (.json)</span>
+                </button>
+                <button class="btn-suite-util" onclick="closeBackupModal()" id="uiModalBtnClose">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pie de Página del Dashboard (Siempre al final real del documento, nunca flotando sobre las cards) -->
+    <footer id="suiteMainFooter" class="suite-footer">
+        <p id="uiSuiteFooterText"><strong>UparApp Studio</strong> — Suite Educativa desarrollada por <a href="https://github.com/kevinluisfl" target="_blank">Kevin Luis Flórez Lozada (klfl)</a> • UparSoft 💻</p>
+    </footer>
+
+    <!-- Controlador Maestro de la Suite -->
+    <script src="suite.js"></script>
+</body>
+
+</html>
