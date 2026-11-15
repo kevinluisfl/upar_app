@@ -881,6 +881,7 @@ function generateSimulatedStudentScan() {
 
 async function toggleCameraStream() {
     const video = document.getElementById('scannerVideo');
+    const canvas = document.getElementById('omrScannerCanvas');
     const guide = document.getElementById('cameraGuideOverlay');
     const btnCam = document.getElementById('uiBtnCameraToggle');
     const btnCap = document.getElementById('btnCaptureFrame');
@@ -897,6 +898,7 @@ async function toggleCameraStream() {
         appState.scanner.stream = stream;
         video.srcObject = stream;
         video.classList.remove('hidden');
+        canvas.classList.add('hidden'); // <-- Oculta la imagen previa mientras apuntas con la cámara
         guide.classList.remove('hidden');
         btnCap.classList.remove('hidden');
         btnCam.textContent = t('btnCameraOff');
@@ -911,6 +913,7 @@ function stopCameraStream() {
         appState.scanner.stream = null;
     }
     document.getElementById('scannerVideo')?.classList.add('hidden');
+    document.getElementById('omrScannerCanvas')?.classList.remove('hidden'); // <-- Vuelve a mostrar el lienzo con el resultado
     document.getElementById('cameraGuideOverlay')?.classList.add('hidden');
     document.getElementById('btnCaptureFrame')?.classList.add('hidden');
     const btnCam = document.getElementById('uiBtnCameraToggle');
