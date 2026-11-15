@@ -618,3 +618,37 @@ window.addEventListener('DOMContentLoaded', () => {
     applySuiteLanguage();
     refreshDashboardMetrics();
 });
+
+
+/* --------------------------------------------------------------------------
+   6. REGISTRO DE PWA Y BOTÓN DE INSTALACIÓN NATIVA EN MÓVIL / PC
+   -------------------------------------------------------------------------- */
+let deferredInstallPrompt = null;
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const btnInstall = document.getElementById('btnInstallPWA');
+    if (btnInstall) btnInstall.classList.remove('hidden');
+});
+
+async function installSuitePWA() {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') {
+        document.getElementById('btnInstallPWA')?.classList.add('hidden');
+    }
+    deferredInstallPrompt = null;
+}
+
+window.addEventListener('appinstalled', () => {
+    document.getElementById('btnInstallPWA')?.classList.add('hidden');
+    deferredInstallPrompt = null;
+});

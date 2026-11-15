@@ -5,6 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UparApp Studio — Suite Interactiva Docente</title>
+    <!-- Configuración PWA para instalar como App en Android, iOS y PC -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="UparApp">
 
     <!-- Google Fonts: Inter & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -66,6 +73,11 @@
 
             <!-- Utilidades Globales Sincronizadas -->
             <div class="suite-actions">
+                <!-- Botón Instalar App (Se muestra automáticamente cuando el dispositivo permite instalar) -->
+                <button id="btnInstallPWA" class="btn-suite-util hidden" onclick="installSuitePWA()" title="Instalar UparApp en tu dispositivo">
+                    <i class="fa-solid fa-download text-indigo"></i>
+                    <span class="hide-md">Instalar App</span>
+                </button>
                 <!-- Idioma Global ES / EN -->
                 <button id="btnSuiteLang" class="btn-suite-util" onclick="toggleSuiteLang()" title="Cambiar Idioma Global / Switch Global Language">
                     <i class="fa-solid fa-globe text-indigo"></i>
