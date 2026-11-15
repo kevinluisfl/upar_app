@@ -7,6 +7,7 @@
 const SUITE_KEYS = {
     THEME: 'uparapp_suite_theme',
     LANG: 'uparapp_suite_lang',
+    ACTIVE_APP: 'uparapp_suite_active_app',
     CHILD_THEMES: ['uparpuzzle_theme', 'ruleta_theme', 'upartrivia_theme', 'upargrade_theme'],
     CHILD_LANGS: ['uparpuzzle_lang', 'ruleta_lang', 'upartrivia_lang', 'upargrade_lang']
 };
@@ -197,6 +198,7 @@ function persistThemeAndLangToStorage() {
 
 function openSuiteApp(appKey) {
     suiteState.activeApp = appKey;
+    localStorage.setItem(SUITE_KEYS.ACTIVE_APP, appKey);
     persistThemeAndLangToStorage();
     updateTopBarBrandIdentity();
 
@@ -617,6 +619,11 @@ window.addEventListener('DOMContentLoaded', () => {
     applySuiteTheme();
     applySuiteLanguage();
     refreshDashboardMetrics();
+
+    const savedApp = localStorage.getItem(SUITE_KEYS.ACTIVE_APP);
+    if (savedApp && savedApp !== 'dashboard') {
+        openSuiteApp(savedApp);
+    }
 });
 
 
