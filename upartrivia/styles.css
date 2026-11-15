@@ -1384,3 +1384,28 @@ textarea:focus {
         grid-template-columns: 1fr;
     }
 }
+
+/* Desactivar hover pegajoso en pantallas táctiles móviles */
+@media (hover: none) {
+    .answer-option:hover:not(:disabled) {
+        border-color: var(--border);
+        background: var(--card-inner);
+        transform: none;
+    }
+}
+
+/* Modo Concentración / Proyección para UparTrivia */
+body.focus-mode .app-header,
+body.focus-mode .app-footer,
+body.focus-mode .game-ladder-card {
+    display: none !important;
+}
+
+body.focus-mode .main-container {
+    max-width: 1100px;
+    padding-top: 1rem;
+}
+
+body.focus-mode .game-layout {
+    grid-template-columns: 1fr !important;
+}
