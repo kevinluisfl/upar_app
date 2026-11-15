@@ -1776,20 +1776,32 @@ function finishWordSearchSelection() {
     renderWordSearchGrid();
 }
 
-/* Eventos táctiles delegados directamente sobre el contenedor #wsGrid para máxima fluidez móvil */
+/* Eventos táctiles delegados directamente sobre #wsGrid (soporta deslizar el dedo y también toque inicio + toque fin sin dejar la última letra pegada) */
 function initWordSearchTouchEvents() {
     const gridEl = document.getElementById('wsGrid');
     if (!gridEl) return;
 
+    let ignoreMouseUntil = 0;
+
+    // Bloquear mousedown/mouseenter sintéticos que el teléfono dispara después de tocar la pantalla
+    gridEl.addEventListener('mousedown', (e) => {
+        if (Date.now() < ignoreMouseUntil) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+    }, true);
+
     gridEl.addEventListener('touchstart', (e) => {
         if (appState.mode !== 'wordsearch') return;
+        ignoreMouseUntil = Date.now() + 1000;
+
         const touch = e.touches[0];
         if (!touch) return;
         const cell = getGridCellFromClientPoint(touch.clientX, touch.clientY);
         if (!cell) return;
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
 
-        // Soporte para modo toque-inicio y toque-fin en pantallas táctiles
+        // Si ya había una primera letra tocada (modo toque inicio + toque fin)
         if (appState.ws.tapStartCell && (appState.ws.tapStartCell.r !== cell.r || appState.ws.tapStartCell.c !== cell.c)) {
             const line = computeLineCells(appState.ws.tapStartCell.r, appState.ws.tapStartCell.c, cell.r, cell.c);
             if (line) {
@@ -1797,22 +1809,35 @@ function initWordSearchTouchEvents() {
                 appState.ws.isSelecting = true;
                 appState.ws.tapStartCell = null;
                 finishWordSearchSelection();
+                // Asegurar que no vuelva a seleccionarse la última letra al levantar el dedo
+                appState.ws.isSelecting = false;
+                appState.ws.tapStartCell = null;
+                appState.ws.selectedCells = [];
+                renderWordSearchGrid();
                 return;
             }
         }
 
+        // Iniciar selección sin destruir el DOM en touchstart (para que touchmove siga vivo en móvil)
         appState.ws.isSelecting = true;
         appState.ws.startCell = cell;
         appState.ws.currentCell = cell;
         appState.ws.selectedCells = [cell];
-        renderWordSearchGrid();
+
+        const targetDomCell = gridEl.querySelector(`[data-r="${cell.r}"][data-c="${cell.c}"]`);
+        if (targetDomCell) {
+            targetDomCell.classList.add('bg-indigo-600', 'text-white', 'scale-105');
+        }
     }, { passive: false });
 
     gridEl.addEventListener('touchmove', (e) => {
         if (appState.mode !== 'wordsearch' || !appState.ws.isSelecting) return;
+        ignoreMouseUntil = Date.now() + 1000;
+
         const touch = e.touches[0];
         if (!touch) return;
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault();
+
         const cell = getGridCellFromClientPoint(touch.clientX, touch.clientY);
         if (cell) {
             onWsCellMouseEnter(cell.r, cell.c);
@@ -1820,8 +1845,11 @@ function initWordSearchTouchEvents() {
     }, { passive: false });
 
     gridEl.addEventListener('touchend', (e) => {
-        if (appState.mode === 'wordsearch' && appState.ws.isSelecting) {
-            e.preventDefault();
+        if (appState.mode !== 'wordsearch') return;
+        ignoreMouseUntil = Date.now() + 1000;
+        if (e.cancelable) e.preventDefault();
+
+        if (appState.ws.isSelecting) {
             finishWordSearchSelection();
         }
     }, { passive: false });
