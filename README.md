@@ -8,7 +8,7 @@ Cuenta con un **Hub Maestro** que centraliza la navegación, sincroniza en tiemp
 
 ## 🚀 Las 4 Aplicaciones de la Suite
 
-### 1. 🧠 UparTrivia — *Competencia Estilo Millonario*
+### 1. 🧠 UparTrivia — *Competencia Estilo Reality*
 Plataforma de trivias por niveles inspirada en *"¿Quién quiere ser millonario?"* para dinamizar evaluaciones y olimpiadas en el aula:
 * **5 Niveles de Dificultad Configurables:** Selección libre de qué rondas jugar y edición personalizada de los puntos por pregunta o del puntaje máximo total (con reescalado automático del ranking).
 * **3 Comodines Estratégicos:** *50:50*, *Cambiar Pregunta* y *Pista del Público*, además de opción de *Plantarse / Retirarse* y pisos de puntaje asegurado.
@@ -23,7 +23,7 @@ Generador algorítmico interactivo de pasatiempos didácticos listos para resolv
 * **Impresión A4/Carta y Exportación PNG:** Impresión limpia blindada contra el modo oscuro, descarga en imagen PNG de alta resolución y gestor local de actividades con buscador y paginación.
 
 ### 3. 📋 UparGrade — *Hojas de Respuesta ICFES y Escáner OMR*
-Sistema de evaluación rápida estilo *ZipGrade* con generación de hojas ópticas y calificación automatizada:
+Sistema de evaluación rápida con generación de hojas ópticas y calificación automatizada:
 * **Diseñador de Exámenes y Clave (Answer Key):** Configura evaluaciones de `10` a `50` preguntas con **3 (`A-C`), 4 (`A-D`) o 5 (`A-E`) opciones**, escala de nota mínima/máxima personalizable y pegado rápido de secuencias de respuestas.
 * **Generador de Hojas Tipo ICFES:** Crea hojas con 4 marcas fiduciales OMR en **Formato Completo** o **Formato Simplificado (Solo Esencial)**, permitiendo imprimir **1, 2, 4 o hasta 6 hojas por página** en orientación vertical, horizontal o automática.
 * **Escáner Óptico OMR (Cámara o Foto):** Detecta automáticamente las burbujas rellenadas mediante análisis de luminancia en `HTML5 Canvas`, dibuja anillos de auditoría (aciertos, errores, blancos/doble marca) y permite corrección manual en un clic.
