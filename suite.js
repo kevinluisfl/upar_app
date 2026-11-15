@@ -100,7 +100,7 @@ const SUITE_I18N = {
         modalBtnExport: 'Descargar Respaldo (.json)',
         modalBtnImport: 'Cargar Archivo (.json)',
         modalBtnClose: 'Cerrar',
-        footerText: '<strong>UparApp Studio</strong> — Suite Educativa desarrollada por <a href="https://github.com/kevinluisfl" target="_blank">Kevin Luis Flórez Lozada (klfl)</a> • UparSoft 💻',
+        footerText: '<strong>UparApp Studio</strong> — Suite Educativa creada por <a href="https://github.com/kevinluisfl" target="_blank">(klfl)</a> • UparSoft 💻',
         toastExportOk: 'Respaldo maestro de las 4 aplicaciones descargado con éxito',
         toastImportOk: 'Respaldo maestro restaurado en las 4 aplicaciones'
     },
@@ -138,7 +138,7 @@ const SUITE_I18N = {
         modalBtnExport: 'Download Backup (.json)',
         modalBtnImport: 'Load File (.json)',
         modalBtnClose: 'Close',
-        footerText: '<strong>UparApp Studio</strong> — Educational Suite developed by <a href="https://github.com/kevinluisfl" target="_blank">Kevin Luis Flórez Lozada (klfl)</a> • UparSoft 💻',
+        footerText: '<strong>UparApp Studio</strong> — Educational Suite created by <a href="https://github.com/kevinluisfl" target="_blank">(klfl)</a> • UparSoft 💻',
         toastExportOk: 'Master backup for all 4 apps downloaded successfully',
         toastImportOk: 'Master backup restored across all 4 apps'
     }

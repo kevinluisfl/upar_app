@@ -74,3 +74,22 @@ Selector aleatorio interactivo para sorteos, participación de estudiantes y asi
     ├── index.html
     ├── styles.css
     └── app.js
+
+## 🚀 Instalación y Uso
+
+La suite funciona **100% en el navegador** sin requerir bases de datos externas ni instalación de dependencias (`node_modules`). Para que la sincronización en tiempo real de temas, idiomas y estilos entre el Hub Maestro y los 4 módulos funcione sin restricciones de seguridad del navegador (`CORS` / `iframe`), se recomienda ejecutarla desde un servidor local o despliegue estático:
+
+### Opción 1: Ejecución Local (Recomendado con VS Code)
+1. Clona este repositorio o descarga el archivo `.zip` del proyecto:
+   ```bash
+   git clone [https://github.com/kevinluisfl/upar_app.git](https://github.com/kevinluisfl/upar_app.git)
+
+2. Abre la carpeta raíz UparApp-Studio en Visual Studio Code.
+
+3. Haz clic derecho sobre el archivo principal index.html y selecciona "Open with Live Server" (o usa cualquier servidor local como npx serve . o python -m http.server).
+
+### Opción 2: Despliegue en la Nube (GitHub Pages / Vercel / Netlify)
+Sube la carpeta completa (manteniendo las 4 subcarpetas upartrivia/, uparpuzzle/, upargrade/ y uparwheel/) a tu repositorio de GitHub.
+
+Activa GitHub Pages desde la pestaña Settings > Pages apuntando a la rama principal (main / root), o importa el repositorio directamente en Vercel sin configurar comandos de compilación (Build Command vacío).
+
