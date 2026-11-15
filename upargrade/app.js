@@ -39,7 +39,7 @@ const I18N = {
         labelMinGrade: 'Nota Mínima',
         labelOptionsCount: 'Opciones',
         metricValPerQ: 'Valor por cada acierto',
-        metricPassing: 'Nota aprobatoria (60%)',
+        metricPassing: 'Nota aprobatoria',
         metricKeyStatus: 'Clave configurada',
         savedExamsTitle: 'Mis Exámenes Guardados',
         emptySavedExams: 'No hay exámenes guardados aún.',
@@ -79,7 +79,7 @@ const I18N = {
         statBlank: 'En Blanco / Doble',
         statPct: 'Porcentaje',
         labelStudentName: 'Nombre del Estudiante',
-        placeholderStudentName: 'Ej. Caroll Cuero - 601',
+        placeholderStudentName: 'Ej. Caroll Lopez - 601',
         labelStudentCode: 'Código / Documento (Opcional)',
         placeholderStudentCode: 'Ej. 106599...',
         btnSaveGrade: 'Registrar Calificación en Planilla',
@@ -98,7 +98,7 @@ const I18N = {
         btnClearGrades: 'Vaciar',
         kpiTotal: 'Evaluados',
         kpiAvg: 'Promedio del Grupo',
-        kpiPassRate: 'Aprobados (≥ 60%)',
+        kpiPassRate: 'Aprobados',
         kpiBest: 'Mejor Nota',
         thResStudent: 'Estudiante',
         thResCode: 'Código',
@@ -157,7 +157,7 @@ const I18N = {
         labelMinGrade: 'Min Grade',
         labelOptionsCount: 'Choices',
         metricValPerQ: 'Value per correct answer',
-        metricPassing: 'Passing grade (60%)',
+        metricPassing: 'Passing grade',
         metricKeyStatus: 'Configured key',
         savedExamsTitle: 'My Saved Exams',
         emptySavedExams: 'No saved exams yet.',
@@ -197,7 +197,7 @@ const I18N = {
         statBlank: 'Blank / Double',
         statPct: 'Percentage',
         labelStudentName: 'Student Name',
-        placeholderStudentName: 'E.g. Caroll Cuero - 601',
+        placeholderStudentName: 'E.g. Caroll Lopez - 601',
         labelStudentCode: 'Student ID (Optional)',
         placeholderStudentCode: 'E.g. 106599...',
         btnSaveGrade: 'Save Grade to Gradebook',
@@ -216,7 +216,7 @@ const I18N = {
         btnClearGrades: 'Clear',
         kpiTotal: 'Graded',
         kpiAvg: 'Class Average',
-        kpiPassRate: 'Pass Rate (≥ 60%)',
+        kpiPassRate: 'Pass Rate',
         kpiBest: 'Highest Grade',
         thResStudent: 'Student',
         thResCode: 'ID',
@@ -281,6 +281,8 @@ function t(key) {
    2. INICIALIZACIÓN Y GESTIÓN DE EXÁMENES (ANSWER KEY & ESCALA DE NOTA)
    -------------------------------------------------------------------------- */
 function createDefaultExam() {
+    const savedMax = parseFloat(localStorage.getItem('upargrade_default_max'));
+    const savedMin = parseFloat(localStorage.getItem('upargrade_default_min'));
     const defaultAnswers = {};
     for (let i = 1; i <= 20; i++) {
         defaultAnswers[i] = LETTERS[(i - 1) % 4];
@@ -291,8 +293,8 @@ function createDefaultExam() {
         course: '601 - Informática',
         questionCount: 20,
         optionsCount: 4,
-        maxGrade: 5.0,
-        minGrade: 1.0,
+        maxGrade: !isNaN(savedMax) ? savedMax : 10.0,
+        minGrade: !isNaN(savedMin) ? savedMin : 0.0,
         answers: defaultAnswers,
         updatedAt: new Date().toISOString().slice(0, 10)
     };
@@ -337,25 +339,65 @@ function syncCurrentExamMeta() {
     const ex = appState.activeExam;
     if (!ex) return;
 
+    const rawMax = parseFloat(document.getElementById('examMaxGrade').value);
+    const rawMin = parseFloat(document.getElementById('examMinGrade').value);
+
     ex.title = document.getElementById('examTitleInput').value.trim() || 'Examen sin título';
     ex.course = document.getElementById('examCourseInput').value.trim() || 'General';
-    ex.maxGrade = Math.max(1, parseFloat(document.getElementById('examMaxGrade').value) || 5.0);
-    ex.minGrade = Math.max(0, parseFloat(document.getElementById('examMinGrade').value) || 0.0);
+    ex.maxGrade = !isNaN(rawMax) && rawMax >= 1 ? rawMax : 10.0;
+    ex.minGrade = !isNaN(rawMin) && rawMin >= 0 ? rawMin : 0.0;
     if (ex.minGrade >= ex.maxGrade) ex.minGrade = 0;
 
+    // Guardar automáticamente como escala predeterminada global para futuros exámenes
+    localStorage.setItem('upargrade_default_max', ex.maxGrade);
+    localStorage.setItem('upargrade_default_min', ex.minGrade);
+
     updateExamMathSummary();
+}
+
+// 
+function getGlobalPassingRatio() {
+    const saved = parseFloat(localStorage.getItem('upargrade_passing_ratio'));
+    return !isNaN(saved) && saved > 0 && saved <= 1 ? saved : 0.6;
+}
+
+function updatePassingLabelsUI(pctInt) {
+    const baseText = appState.lang === 'en' ? 'Pass Rate' : 'Aprobados';
+    const fullText = `${baseText} (≥ ${pctInt}%)`;
+
+    // 1. Actualizar directamente el texto en pantalla (ID: uiKpiPassRate)
+    const el = document.getElementById('uiKpiPassRate');
+    if (el) el.textContent = fullText;
+
+    // 2. Actualizar el diccionario I18N para que al cambiar de idioma conserve el (≥ X%)
+    if (typeof I18N !== 'undefined') {
+        if (I18N.es) I18N.es.kpiPassRate = `Aprobados (≥ ${pctInt}%)`;
+        if (I18N.en) I18N.en.kpiPassRate = `Pass Rate (≥ ${pctInt}%)`;
+    }
 }
 
 function updateExamMathSummary() {
     const ex = appState.activeExam;
     if (!ex) return;
 
+    const ratio = getGlobalPassingRatio();
+    const pctInt = Math.round(ratio * 100);
     const range = ex.maxGrade - ex.minGrade;
     const valPerQuestion = range / ex.questionCount;
-    const passingGrade = ex.minGrade + range * 0.6;
+    const passingGrade = ex.minGrade + range * ratio;
 
     document.getElementById('metricPointsPerQuestion').textContent = `+${valPerQuestion.toFixed(3)} pts`;
-    document.getElementById('metricPassingGrade').textContent = passingGrade.toFixed(2);
+
+    const pctEl = document.getElementById('passingPctInput');
+    const gradeEl = document.getElementById('metricPassingGrade');
+    if (pctEl && document.activeElement !== pctEl) {
+        pctEl.textContent = pctInt;
+    }
+    if (gradeEl && document.activeElement !== gradeEl) {
+        gradeEl.textContent = passingGrade.toFixed(2);
+    }
+
+    updatePassingLabelsUI(pctInt);
 
     let configuredCount = 0;
     for (let i = 1; i <= ex.questionCount; i++) {
@@ -364,6 +406,68 @@ function updateExamMathSummary() {
     document.getElementById('metricKeyProgress').textContent = `${configuredCount} / ${ex.questionCount}`;
     document.getElementById('scannerActiveExamBadge').textContent = `${ex.title} (${ex.questionCount} Q)`;
 }
+
+function onPassingPctChange(rawText) {
+    const ex = appState.activeExam;
+    if (!ex) return;
+
+    let pct = parseFloat(String(rawText).replace(',', '.'));
+    if (isNaN(pct)) return;
+    pct = Math.max(1, Math.min(100, pct));
+
+    const ratio = pct / 100;
+    localStorage.setItem('upargrade_passing_ratio', ratio);
+
+    const range = ex.maxGrade - ex.minGrade;
+    const passingGrade = ex.minGrade + range * ratio;
+
+    const gradeEl = document.getElementById('metricPassingGrade');
+    if (gradeEl && document.activeElement !== gradeEl) {
+        gradeEl.textContent = passingGrade.toFixed(2);
+    }
+
+    updatePassingLabelsUI(Math.round(pct));
+    syncPassingAcrossAllResults();
+}
+
+function onPassingGradeChange(rawText) {
+    const ex = appState.activeExam;
+    if (!ex) return;
+
+    let grade = parseFloat(String(rawText).replace(',', '.'));
+    if (isNaN(grade)) return;
+
+    const range = ex.maxGrade - ex.minGrade;
+    if (range <= 0) return;
+
+    let ratio = (grade - ex.minGrade) / range;
+    ratio = Math.max(0.01, Math.min(1, ratio));
+    localStorage.setItem('upargrade_passing_ratio', ratio);
+
+    const pctInt = Math.round(ratio * 100);
+    const pctEl = document.getElementById('passingPctInput');
+    if (pctEl && document.activeElement !== pctEl) {
+        pctEl.textContent = pctInt;
+    }
+
+    updatePassingLabelsUI(pctInt);
+    syncPassingAcrossAllResults();
+}
+
+// Aplica la nueva nota aprobatoria a TODOS los registros guardados
+function syncPassingAcrossAllResults() {
+    const minPassPct = Math.round(getGlobalPassingRatio() * 100);
+
+    if (Array.isArray(appState.results)) {
+        appState.results.forEach(r => {
+            r.passed = (r.percentage ?? 0) >= minPassPct;
+        });
+        localStorage.setItem('upargrade_results_v1', JSON.stringify(appState.results));
+    }
+
+    if (typeof renderGradebookTable === 'function') renderGradebookTable();
+}
+//
 
 function handleQuestionCountChange(val) {
     const count = parseInt(val, 10) || 20;
@@ -458,14 +562,17 @@ function applyQuickKeyString() {
 }
 
 function createNewBlankExam() {
+    const savedMax = parseFloat(localStorage.getItem('upargrade_default_max'));
+    const savedMin = parseFloat(localStorage.getItem('upargrade_default_min'));
+
     const newEx = {
         id: 'exam_' + Date.now(),
         title: 'Nueva Evaluación ICFES',
         course: 'Grado 601',
         questionCount: 20,
         optionsCount: 4,
-        maxGrade: 5.0,
-        minGrade: 1.0,
+        maxGrade: !isNaN(savedMax) ? savedMax : 10.0,
+        minGrade: !isNaN(savedMin) ? savedMin : 0.0,
         answers: {},
         updatedAt: new Date().toISOString().slice(0, 10)
     };
@@ -1208,9 +1315,13 @@ function renderGradebookTable() {
         .filter(r => currentFilter === 'all' || r.examTitle === currentFilter)
         .filter(r => !searchVal || r.studentName.toLowerCase().includes(searchVal) || r.studentCode.toLowerCase().includes(searchVal));
 
+        // Tomar el porcentaje aprobatorio configurado globalmente (ej. 80%)
+    const minPassPct = Math.round(getGlobalPassingRatio() * 100);
+    updatePassingLabelsUI(minPassPct);
+
     const totalEval = filtered.length;
     const avgGrade = totalEval > 0 ? (filtered.reduce((acc, r) => acc + r.grade, 0) / totalEval) : 0;
-    const passCount = filtered.filter(r => r.percentage >= 60).length;
+    const passCount = filtered.filter(r => r.percentage >= minPassPct).length;
     const passRate = totalEval > 0 ? Math.round((passCount / totalEval) * 100) : 0;
     const bestGrade = totalEval > 0 ? Math.max(...filtered.map(r => r.grade)) : 0;
 
@@ -1226,7 +1337,7 @@ function renderGradebookTable() {
     }
 
     tbody.innerHTML = filtered.map((r, idx) => {
-        const badgeColor = r.percentage >= 60 ? 'text-emerald' : 'text-amber';
+        const badgeColor = r.percentage >= minPassPct ? 'text-emerald' : 'text-amber';
         return `
             <tr>
                 <td class="font-mono">${idx + 1}</td>
@@ -1635,6 +1746,7 @@ function applyTranslations() {
     renderPrintableSheets();
     renderScannedAuditList();
     renderGradebookTable();
+    updatePassingLabelsUI(Math.round(getGlobalPassingRatio() * 100));
 }
 
 /* Exposición global explícita */

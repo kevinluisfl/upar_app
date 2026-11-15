@@ -133,11 +133,11 @@
                     <div class="form-row-3">
                         <div class="form-group">
                             <label for="examMaxGrade" id="uiLabelMaxGrade">Nota Máxima</label>
-                            <input type="number" id="examMaxGrade" value="10" step="0.1" min="1" max="1000" oninput="syncCurrentExamMeta()">
+                            <input type="number" id="examMaxGrade" value="10.0" step="0.1" min="1" max="1000" oninput="syncCurrentExamMeta()">
                         </div>
                         <div class="form-group">
                             <label for="examMinGrade" id="uiLabelMinGrade">Nota Mínima</label>
-                            <input type="number" id="examMinGrade" value="0" step="0.1" min="0" max="100" oninput="syncCurrentExamMeta()">
+                            <input type="number" id="examMinGrade" value="0.0" step="0.1" min="0" max="100" oninput="syncCurrentExamMeta()">
                         </div>
                         <div class="form-group">
                             <label for="examOptionsCount" id="uiLabelOptionsCount">Opciones</label>
@@ -155,10 +155,17 @@
                             <span id="uiMetricValPerQ">Valor por cada acierto</span>
                             <strong id="metricPointsPerQuestion" class="font-mono text-indigo">+0.25 pts</strong>
                         </div>
-                        <div class="summary-metric">
+                        <!-- <div class="summary-metric">
                             <span id="uiMetricPassing">Nota aprobatoria (60%)</span>
                             <strong id="metricPassingGrade" class="font-mono text-emerald">3.00</strong>
+                        </div> -->
+                      <div class="summary-metric">
+                            <span style="display: inline-block; white-space: nowrap;">
+                                <span id="uiMetricPassing" style="display: inline;">Nota aprobatoria</span> (<span id="passingPctInput" contenteditable="true" spellcheck="false" title="Clic para editar porcentaje" style="display: inline;" oninput="onPassingPctChange(this.textContent)" onblur="updateExamMathSummary()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">60</span>%)
+                            </span>
+                            <strong id="metricPassingGrade" class="font-mono text-emerald" contenteditable="true" spellcheck="false" title="Clic para editar nota aprobatoria" oninput="onPassingGradeChange(this.textContent)" onblur="updateExamMathSummary()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">6.00</strong>
                         </div>
+
                         <div class="summary-metric">
                             <span id="uiMetricKeyStatus">Clave configurada</span>
                             <strong id="metricKeyProgress" class="font-mono">20 / 20</strong>
@@ -364,7 +371,7 @@
                     <div class="form-row-2">
                         <div class="form-group">
                             <label for="scannedStudentName" id="uiLabelStudentName">Nombre del Estudiante</label>
-                            <input type="text" id="scannedStudentName" placeholder="Ej. Caroll Cuero - 601">
+                            <input type="text" id="scannedStudentName" placeholder="Ej. Caroll Lopez - 601">
                         </div>
                         <div class="form-group">
                             <label for="scannedStudentId" id="uiLabelStudentCode">Código / Documento (Opcional)</label>

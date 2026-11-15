@@ -1212,3 +1212,23 @@ input:focus, select:focus {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* Edición limpia al clic para porcentaje y nota aprobatoria */
+#passingPctInput,
+#metricPassingGrade {
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 0 3px;
+    transition: background 0.15s ease, outline 0.15s ease;
+}
+
+#passingPctInput:hover,
+#metricPassingGrade:hover {
+    background: rgba(99, 102, 241, 0.12);
+}
+
+#passingPctInput:focus,
+#metricPassingGrade:focus {
+    outline: 1px dashed var(--indigo);
+    background: var(--card);
+}
