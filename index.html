@@ -100,8 +100,8 @@
                     <!-- Botón Instalar App (Se muestra automáticamente cuando el dispositivo permite instalar) -->
                     <button type="button" id="btnInstallPWA" class="btn-suite-util hidden" onclick="installSuitePWA(); closeMobileActionsMenu();" title="Instalar UparApp en tu dispositivo">
                         <i class="fa-solid fa-download text-indigo"></i>
-                        <span class="hide-md">Instalar App</span>
-                        <span class="only-mobile-label">Instalar App</span>
+                        <span class="hide-md" id="uiInstallMaster">Instalar App</span>
+                        <span class="only-mobile-label" id="uiMobileInstallText">Instalar App</span>
                     </button>
 
                     <!-- Idioma Global ES / EN -->
@@ -121,7 +121,7 @@
                     <button type="button" class="btn-suite-util" onclick="openBackupModal(); closeMobileActionsMenu();" title="Respaldo Maestro de las 4 Apps">
                         <i class="fa-solid fa-database text-indigo"></i>
                         <span id="uiBtnMasterBackup" class="hide-md">Respaldo</span>
-                        <span class="only-mobile-label">Respaldo</span>
+                        <span class="only-mobile-label" id="uiMobileBackupText">Respaldo</span>
                     </button>
 
                     <!-- Pantalla Completa Global -->

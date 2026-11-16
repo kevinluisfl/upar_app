@@ -69,6 +69,12 @@ const BRAND_PROFILES = {
 const SUITE_I18N = {
     es: {
         navHome: 'Inicio',
+        mobileInstallText: 'Instalar App',
+        installMaster: 'Instalar App',
+        mobileLangText: 'Idioma',
+        mobileThemeText: 'Tema',
+        mobileBackupText: 'Respaldo',
+        mobileFsText: 'Pantalla',
         btnMasterBackup: 'Respaldo',
         heroKicker: '<i class="fa-solid fa-wand-magic-sparkles"></i> UparSoft Educación Digital',
         heroTitle: 'Bienvenido a UparApp Studio',
@@ -108,6 +114,12 @@ const SUITE_I18N = {
     en: {
         navHome: 'Home',
         btnMasterBackup: 'Backup',
+        installMaster: 'Install App',
+        mobileInstallText: 'Install App',
+        mobileLangText: 'Language',
+        mobileThemeText: 'Theme',
+        mobileBackupText: 'Backup',
+        mobileFsText: 'Fullscreen',
         heroKicker: '<i class="fa-solid fa-wand-magic-sparkles"></i> UparSoft Digital Education',
         heroTitle: 'Welcome to UparApp Studio',
         heroDesc: 'Pick any of the 4 interactive teaching tools below. All your saved data, visual themes, and language preferences are automatically synced in one place.',
@@ -464,6 +476,12 @@ function applySuiteLanguage() {
     setTxt('uiModalBtnImport', st('modalBtnImport'));
     setTxt('uiModalBtnClose', st('modalBtnClose'));
     document.getElementById('uiSuiteFooterText').innerHTML = st('footerText');
+    setTxt('uiMobileInstallText', st('mobileInstallText'));
+    setTxt('uiMobileLangText', st('mobileLangText'));
+    setTxt('uiMobileThemeText', st('mobileThemeText'));
+    setTxt('uiMobileBackupText', st('mobileBackupText'));
+    setTxt('uiMobileFsText', st('mobileFsText'));
+    setTxt('uiInstallMaster', st('installMaster'));
 
     refreshDashboardMetrics();
     syncAllLoadedIframes();
@@ -607,7 +625,7 @@ function closeMobileActionsMenu() {
 }
 
 function toggleMobileActionsMenu(event) {
-    event?.stopPropagation();
+    if (event) event.stopPropagation();
     const menu = document.getElementById('suiteActionsDropdown');
     const btn = document.getElementById('btnMobileMoreMenu');
     if (!menu) return;
@@ -615,12 +633,14 @@ function toggleMobileActionsMenu(event) {
     if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
 }
 
-document.addEventListener('click', (e) => {
+document.addEventListener('pointerdown', (e) => {
     const wrapper = document.getElementById('suiteActionsWrapper');
     if (wrapper && !wrapper.contains(e.target)) {
         closeMobileActionsMenu();
     }
 });
+
+window.addEventListener('blur', closeMobileActionsMenu);
 
 window.addEventListener('DOMContentLoaded', () => {
     applySuiteTheme();
