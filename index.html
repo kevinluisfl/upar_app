@@ -14,6 +14,22 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="UparApp">
+    <script>
+        (function () {
+            try {
+                const savedTheme =
+                    localStorage.getItem('uparapp_suite_theme') ||
+                    localStorage.getItem('uparpuzzle_theme') ||
+                    localStorage.getItem('ruleta_theme') ||
+                    localStorage.getItem('upartrivia_theme') ||
+                    localStorage.getItem('upargrade_theme') ||
+                    'light';
+                const isDark = savedTheme === 'dark';
+                document.documentElement.classList.toggle('dark', isDark);
+                document.documentElement.classList.toggle('light', !isDark);
+            } catch (e) {}
+        })();
+    </script>
 
     <!-- Google Fonts: Inter & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -75,33 +91,45 @@
             </nav>
 
             <!-- Utilidades Globales Sincronizadas -->
-            <div class="suite-actions">
-                <!-- Botón Instalar App (Se muestra automáticamente cuando el dispositivo permite instalar) -->
-                <button id="btnInstallPWA" class="btn-suite-util hidden" onclick="installSuitePWA()" title="Instalar UparApp en tu dispositivo">
-                    <i class="fa-solid fa-download text-indigo"></i>
-                    <span class="hide-md">Instalar App</span>
-                </button>
-                <!-- Idioma Global ES / EN -->
-                <button id="btnSuiteLang" class="btn-suite-util" onclick="toggleSuiteLang()" title="Cambiar Idioma Global / Switch Global Language">
-                    <i class="fa-solid fa-globe text-indigo"></i>
-                    <span id="suiteLangLabel">ES</span>
+            <div class="suite-actions" id="suiteActionsWrapper">
+                <button type="button" id="btnMobileMoreMenu" class="btn-suite-util btn-icon mobile-more-toggle" onclick="toggleMobileActionsMenu(event)" title="Más opciones" aria-expanded="false">
+                    <i class="fa-solid fa-sliders text-indigo"></i>
                 </button>
 
-                <!-- Tema Global Claro / Oscuro -->
-                <button id="btnSuiteTheme" class="btn-suite-util btn-icon" onclick="toggleSuiteTheme()" title="Cambiar Tema Global Claro / Oscuro">
-                    <i id="suiteThemeIcon" class="fa-solid fa-moon text-indigo"></i>
-                </button>
+                <div id="suiteActionsDropdown" class="suite-actions-menu">
+                    <!-- Botón Instalar App (Se muestra automáticamente cuando el dispositivo permite instalar) -->
+                    <button type="button" id="btnInstallPWA" class="btn-suite-util hidden" onclick="installSuitePWA(); closeMobileActionsMenu();" title="Instalar UparApp en tu dispositivo">
+                        <i class="fa-solid fa-download text-indigo"></i>
+                        <span class="hide-md">Instalar App</span>
+                        <span class="only-mobile-label">Instalar App</span>
+                    </button>
 
-                <!-- Respaldo Maestro Unificado JSON -->
-                <button class="btn-suite-util" onclick="openBackupModal()" title="Respaldo Maestro de las 4 Apps">
-                    <i class="fa-solid fa-database text-indigo"></i>
-                    <span id="uiBtnMasterBackup" class="hide-md">Respaldo</span>
-                </button>
+                    <!-- Idioma Global ES / EN -->
+                    <button type="button" id="btnSuiteLang" class="btn-suite-util" onclick="toggleSuiteLang(); closeMobileActionsMenu();" title="Cambiar Idioma Global / Switch Global Language">
+                        <i class="fa-solid fa-globe text-indigo"></i>
+                        <span id="suiteLangLabel">ES</span>
+                        <span class="only-mobile-label" id="uiMobileLangText">Idioma</span>
+                    </button>
 
-                <!-- Pantalla Completa Global -->
-                <button id="btnSuiteFullscreen" class="btn-suite-util btn-icon" onclick="toggleSuiteFullscreen()" title="Pantalla Completa">
-                    <i id="suiteFsIcon" class="fa-solid fa-expand text-indigo"></i>
-                </button>
+                    <!-- Tema Global Claro / Oscuro -->
+                    <button type="button" id="btnSuiteTheme" class="btn-suite-util btn-icon" onclick="toggleSuiteTheme(); closeMobileActionsMenu();" title="Cambiar Tema Global Claro / Oscuro">
+                        <i id="suiteThemeIcon" class="fa-solid fa-moon text-indigo"></i>
+                        <span class="only-mobile-label" id="uiMobileThemeText">Tema</span>
+                    </button>
+
+                    <!-- Respaldo Maestro Unificado JSON -->
+                    <button type="button" class="btn-suite-util" onclick="openBackupModal(); closeMobileActionsMenu();" title="Respaldo Maestro de las 4 Apps">
+                        <i class="fa-solid fa-database text-indigo"></i>
+                        <span id="uiBtnMasterBackup" class="hide-md">Respaldo</span>
+                        <span class="only-mobile-label">Respaldo</span>
+                    </button>
+
+                    <!-- Pantalla Completa Global -->
+                    <button type="button" id="btnSuiteFullscreen" class="btn-suite-util btn-icon" onclick="toggleSuiteFullscreen(); closeMobileActionsMenu();" title="Pantalla Completa">
+                        <i id="suiteFsIcon" class="fa-solid fa-expand text-indigo"></i>
+                        <span class="only-mobile-label" id="uiMobileFsText">Pantalla</span>
+                    </button>
+                </div>
             </div>
 
         </div>
@@ -267,18 +295,34 @@
              VISTAS EMBEBIDAS DE LAS 4 APLICACIONES
              ===================================================================== -->
         <section id="viewApp_uparpuzzle" class="suite-view app-frame-view">
+            <div id="loader_uparpuzzle" class="app-loading-overlay">
+                <div class="app-loading-spinner" style="border-top-color: var(--blue);"></div>
+                <span class="app-loading-text">Cargando UparPuzzle...</span>
+            </div>
             <iframe id="frame_uparpuzzle" data-src="./uparpuzzle/index.html" title="UparPuzzle"></iframe>
         </section>
 
         <section id="viewApp_uparwheel" class="suite-view app-frame-view">
+            <div id="loader_uparwheel" class="app-loading-overlay">
+                <div class="app-loading-spinner" style="border-top-color: var(--emerald);"></div>
+                <span class="app-loading-text">Cargando UparWheel...</span>
+            </div>
             <iframe id="frame_uparwheel" data-src="./uparwheel/index.html" title="UparWheel"></iframe>
         </section>
 
         <section id="viewApp_upartrivia" class="suite-view app-frame-view">
+            <div id="loader_upartrivia" class="app-loading-overlay">
+                <div class="app-loading-spinner" style="border-top-color: var(--amber);"></div>
+                <span class="app-loading-text">Cargando UparTrivia...</span>
+            </div>
             <iframe id="frame_upartrivia" data-src="./upartrivia/index.html" title="UparTrivia"></iframe>
         </section>
 
         <section id="viewApp_upargrade" class="suite-view app-frame-view">
+            <div id="loader_upargrade" class="app-loading-overlay">
+                <div class="app-loading-spinner" style="border-top-color: var(--rose);"></div>
+                <span class="app-loading-text">Cargando UparGrade...</span>
+            </div>
             <iframe id="frame_upargrade" data-src="./upargrade/index.html" title="UparGrade"></iframe>
         </section>
 

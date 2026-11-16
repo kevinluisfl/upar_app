@@ -231,15 +231,28 @@ function openSuiteApp(appKey) {
     const iframe = document.getElementById(`frame_${appKey}`);
     if (targetSection) targetSection.classList.add('active');
 
+    const frameBg = suiteState.theme === 'dark' ? '#020617' : '#f8fafc';
+    if (targetSection) targetSection.style.backgroundColor = frameBg;
+
+    const loader = document.getElementById(`loader_${appKey}`);
+
     if (iframe) {
+        iframe.style.backgroundColor = frameBg;
         const targetUrl = `${iframe.dataset.src}?suite=1&theme=${suiteState.theme}&lang=${suiteState.lang}`;
         if (!iframe.getAttribute('src')) {
+            if (loader) loader.classList.remove('is-hidden');
+            iframe.style.opacity = '0';
+            iframe.style.transition = 'opacity 0.15s ease';
             iframe.onload = () => {
                 injectSeamlessChildMode(iframe, appKey);
                 syncSingleIframeAppearance(iframe);
+                iframe.style.opacity = '1';
+                if (loader) loader.classList.add('is-hidden');
             };
             iframe.setAttribute('src', targetUrl);
         } else {
+            iframe.style.opacity = '1';
+            if (loader) loader.classList.add('is-hidden');
             injectSeamlessChildMode(iframe, appKey);
             syncSingleIframeAppearance(iframe);
         }
@@ -310,13 +323,13 @@ function injectSeamlessChildMode(iframe, appKey) {
                     margin-bottom: 0.75rem !important;
                 }
                 ` : ''}
-                /* 5. Compactar cabecera en UparPuzzle y UparTrivia */
+               /* 5. Compactar cabecera en UparPuzzle y UparTrivia */
                 .app-header .header-container,
                 #appMainHeader > div {
-                    padding-top: 0.4rem !important;
-                    padding-bottom: 0.4rem !important;
+                    padding-top: 0.35rem !important;
+                    padding-bottom: 0.35rem !important;
                     justify-content: center !important;
-                    gap: 0.75rem !important;
+                    gap: 0.5rem !important;
                 }
                 /* 6. Ocultar el pie de página interno de cada app hija */
                 footer, .app-footer, #appMainFooter {
@@ -327,43 +340,6 @@ function injectSeamlessChildMode(iframe, appKey) {
         }
     } catch (e) {}
 }
-
-/**
- * Sincroniza Tema e Idioma dentro del iframe hijo
- */
-// function syncSingleIframeAppearance(iframe) {
-//     if (!iframe) return;
-
-//     try {
-//         const win = iframe.contentWindow;
-//         const doc = iframe.contentDocument || win?.document;
-//         if (!win || !doc) return;
-
-//         doc.documentElement.classList.toggle('dark', suiteState.theme === 'dark');
-//         doc.documentElement.classList.toggle('light', suiteState.theme !== 'dark');
-//         doc.documentElement.lang = suiteState.lang;
-
-//         const childThemeBtn = doc.getElementById('btnThemeToggle') || doc.getElementById('themeToggleBtn');
-//         const isChildDark = doc.documentElement.classList.contains('dark');
-//         if (childThemeBtn && ((suiteState.theme === 'dark' && !isChildDark) || (suiteState.theme === 'light' && isChildDark))) {
-//             childThemeBtn.click();
-//         }
-
-//         const childLangLabel = doc.getElementById('langLabel');
-//         const currentChildLang = childLangLabel ? childLangLabel.textContent.trim().toLowerCase() : null;
-//         const childLangBtn = doc.getElementById('btnLangToggle') || doc.getElementById('langToggleBtn');
-//         if (childLangBtn && currentChildLang && currentChildLang !== suiteState.lang) {
-//             childLangBtn.click();
-//         }
-
-//         if (win.appState && typeof win.appState === 'object') {
-//             win.appState.theme = suiteState.theme;
-//             win.appState.lang = suiteState.lang;
-//         }
-//         if (typeof win.applyTheme === 'function') win.applyTheme();
-//         if (typeof win.applyTranslations === 'function') win.applyTranslations();
-//     } catch (e) {}
-// }
 
 /**
  * Sincroniza Tema e Idioma dentro del iframe hijo en tiempo real (sin recargar)
@@ -622,6 +598,29 @@ function showSuiteToast(msg, icon = 'fa-circle-check') {
     container.appendChild(div);
     setTimeout(() => div.remove(), 3300);
 }
+
+function closeMobileActionsMenu() {
+    const menu = document.getElementById('suiteActionsDropdown');
+    const btn = document.getElementById('btnMobileMoreMenu');
+    if (menu) menu.classList.remove('open');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function toggleMobileActionsMenu(event) {
+    event?.stopPropagation();
+    const menu = document.getElementById('suiteActionsDropdown');
+    const btn = document.getElementById('btnMobileMoreMenu');
+    if (!menu) return;
+    const isOpen = menu.classList.toggle('open');
+    if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+}
+
+document.addEventListener('click', (e) => {
+    const wrapper = document.getElementById('suiteActionsWrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+        closeMobileActionsMenu();
+    }
+});
 
 window.addEventListener('DOMContentLoaded', () => {
     applySuiteTheme();
