@@ -27,6 +27,8 @@ const I18N = {
         btnPrintTop: 'Imprimir Hoja',
         examConfigTitle: 'Configuración del Examen',
         btnNewExam: 'Nuevo',
+        btnDuplicateExam: 'Duplicar',
+        toastExamDuplicated: 'Examen duplicado. Cambia el curso o nombre y pulsa Guardar',
         labelExamTitle: 'Nombre del Examen / Evaluación',
         btnSaveExam: 'Guardar',
         labelCourse: 'Grado / Asignatura',
@@ -145,6 +147,8 @@ const I18N = {
         btnPrintTop: 'Print Sheet',
         examConfigTitle: 'Exam Configuration',
         btnNewExam: 'New',
+        btnDuplicateExam: 'Duplicate',
+        toastExamDuplicated: 'Exam duplicated. Update course or title and click Save',
         labelExamTitle: 'Exam / Assessment Title',
         btnSaveExam: 'Save',
         labelCourse: 'Grade / Subject',
@@ -583,12 +587,49 @@ function createNewBlankExam() {
     renderPrintableSheets();
 }
 
+function duplicateExamById(examId) {
+    const source = examId
+        ? appState.exams.find(e => e.id === examId)
+        : appState.activeExam;
+    if (!source) return;
+
+    const copySuffix = appState.lang === 'en' ? '(Copy)' : '(Copia)';
+    const duplicated = {
+        ...JSON.parse(JSON.stringify(source)),
+        id: 'exam_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        title: `${source.title} ${copySuffix}`,
+        updatedAt: new Date().toISOString().slice(0, 10)
+    };
+
+    appState.activeExam = duplicated;
+    appState.exams.unshift(JSON.parse(JSON.stringify(duplicated)));
+    saveExamsToStorage();
+
+    populateExamFormInputs();
+    renderAnswerKeyGrid();
+    renderSavedExamsList();
+    renderPrintableSheets();
+    drawReferenceSheetOnScannerCanvas(false);
+
+    const courseInput = document.getElementById('examCourseInput');
+    if (courseInput) courseInput.focus();
+
+    showToast(t('toastExamDuplicated'), 'fa-copy');
+}
+
+function duplicateCurrentExam() {
+    syncCurrentExamMeta();
+    if (!appState.activeExam) return;
+    duplicateExamById(null);
+}
+
 function saveCurrentExam() {
     syncCurrentExamMeta();
     const ex = appState.activeExam;
     ex.updatedAt = new Date().toISOString().slice(0, 10);
 
-    const idx = appState.exams.findIndex(item => item.id === ex.id || item.title.toLowerCase() === ex.title.toLowerCase());
+    // const idx = appState.exams.findIndex(item => item.id === ex.id || item.title.toLowerCase() === ex.title.toLowerCase());
+    const idx = appState.exams.findIndex(item => item.id === ex.id);
     const clone = JSON.parse(JSON.stringify(ex));
     if (idx >= 0) {
         appState.exams[idx] = clone;
@@ -658,10 +699,13 @@ function renderSavedExamsList() {
                 <p>${ex.course} • ${ex.questionCount} ${t('questionsShort')} (${ex.optionsCount} ${t('optionsShort')}) • ${t('scaleWord')} ${ex.minGrade} - ${ex.maxGrade}</p>
             </div>
             <div style="display:flex; gap:0.35rem;">
-                <button type="button" class="btn-mini" onclick="loadSavedExam('${ex.id}')">
+                <button type="button" class="btn-mini" onclick="loadSavedExam('${ex.id}')" title="Abrir">
                     <i class="fa-regular fa-folder-open"></i>
                 </button>
-                <button type="button" class="btn-mini-danger" onclick="deleteSavedExam('${ex.id}')">
+                <button type="button" class="btn-mini" onclick="duplicateExamById('${ex.id}')" title="Duplicar">
+                    <i class="fa-regular fa-copy"></i>
+                </button>
+                <button type="button" class="btn-mini-danger" onclick="deleteSavedExam('${ex.id}')" title="Eliminar">
                     <i class="fa-regular fa-trash-can"></i>
                 </button>
             </div>
@@ -1357,9 +1401,53 @@ function renderGradebookTable() {
 }
 
 function deleteSingleResult(resId) {
-    appState.results = appState.results.filter(r => r.id !== resId);
-    saveResultsToStorage();
-    renderGradebookTable();
+    const record = appState.results.find(r => r.id === resId);
+    if (!record) return;
+
+    const isEn = appState.lang === 'en';
+    const titleText = isEn ? 'Delete student grade record?' : '¿Eliminar calificación del estudiante?';
+    const safeStudent = String(record.studentName || '').replace(/</g, '<').replace(/>/g, '>');
+    const safeExam = String(record.examTitle || '').replace(/</g, '<').replace(/>/g, '>');
+    const gradeStr = `${Number(record.grade || 0).toFixed(2)} / ${record.maxGrade}`;
+
+    const descHtml = isEn
+        ? `You are about to remove the grade record for <strong>${safeStudent}</strong> in <strong>${safeExam}</strong> (<strong>${gradeStr}</strong>).`
+        : `Se eliminará el registro de <strong>${safeStudent}</strong> en <strong>${safeExam}</strong> (nota: <strong>${gradeStr}</strong>).`;
+
+    const confirmBtnText = isEn ? 'Yes, delete record' : 'Sí, eliminar registro';
+    const toastMsg = isEn
+        ? `Grade record deleted for ${safeStudent}`
+        : `Calificación eliminada para ${safeStudent}`;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'upar-modal-overlay';
+    overlay.innerHTML = `
+        <div class="upar-modal-box">
+            <h3><i class="fa-solid fa-triangle-exclamation text-amber"></i> ${titleText}</h3>
+            <p>${descHtml}</p>
+            <div class="upar-modal-actions">
+                <button type="button" class="btn-utility" id="btnCancelDeleteSingleResult">
+                    ${t('btnImportCancel')}
+                </button>
+                <button type="button" class="btn-danger-sm" id="btnConfirmDeleteSingleResult">
+                    <i class="fa-regular fa-trash-can"></i> ${confirmBtnText}
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#btnCancelDeleteSingleResult').onclick = () => {
+        overlay.remove();
+    };
+
+    overlay.querySelector('#btnConfirmDeleteSingleResult').onclick = () => {
+        overlay.remove();
+        appState.results = appState.results.filter(r => r.id !== resId);
+        saveResultsToStorage();
+        renderGradebookTable();
+        showToast(toastMsg, 'fa-trash-can');
+    };
 }
 
 function clearGradebookForCurrentExam() {
@@ -1650,6 +1738,7 @@ function applyTranslations() {
     setText('uiBtnPrintTop', t('btnPrintTop'));
     setText('uiExamConfigTitle', t('examConfigTitle'));
     setText('uiBtnNewExam', t('btnNewExam'));
+    setText('uiBtnDuplicateExam', t('btnDuplicateExam'));
     setText('uiLabelExamTitle', t('labelExamTitle'));
     setText('uiBtnSaveExam', t('btnSaveExam'));
     setText('uiLabelCourse', t('labelCourse'));
@@ -1754,6 +1843,8 @@ Object.assign(window, {
     switchView,
     printAnswerSheet,
     createNewBlankExam,
+    duplicateCurrentExam,
+    duplicateExamById,
     syncCurrentExamMeta,
     saveCurrentExam,
     handleQuestionCountChange,

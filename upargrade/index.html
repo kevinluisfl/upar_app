@@ -60,24 +60,24 @@
             </div>
         </div>
 
-        <!-- Fila 2: Menú de las 4 Opciones debajo y centrado -->
+<!-- Fila 2: Menú de las 4 Opciones debajo y centrado -->
         <div class="subnav-bar">
             <nav class="nav-tabs">
-                <button class="nav-tab active" data-view="exams" onclick="switchView('exams')">
+                <button class="nav-tab active" data-view="exams" onclick="switchView('exams')" title="1. Examen y Clave">
                     <i class="fa-solid fa-sliders"></i>
-                    <span id="uiNavExams">1. Examen y Clave</span>
+                    <span id="uiNavExams" class="tab-label">1. Examen y Clave</span>
                 </button>
-                <button class="nav-tab" data-view="sheet" onclick="switchView('sheet')">
+                <button class="nav-tab" data-view="sheet" onclick="switchView('sheet')" title="2. Hoja ICFES">
                     <i class="fa-solid fa-file-lines"></i>
-                    <span id="uiNavSheet">2. Hoja ICFES</span>
+                    <span id="uiNavSheet" class="tab-label">2. Hoja ICFES</span>
                 </button>
-                <button class="nav-tab" data-view="scanner" onclick="switchView('scanner')">
+                <button class="nav-tab" data-view="scanner" onclick="switchView('scanner')" title="3. Escáner OMR">
                     <i class="fa-solid fa-camera"></i>
-                    <span id="uiNavScanner">3. Escáner OMR</span>
+                    <span id="uiNavScanner" class="tab-label">3. Escáner OMR</span>
                 </button>
-                <button class="nav-tab" data-view="results" onclick="switchView('results')">
+                <button class="nav-tab" data-view="results" onclick="switchView('results')" title="4. Calificaciones">
                     <i class="fa-solid fa-chart-column"></i>
-                    <span id="uiNavResults">4. Calificaciones</span>
+                    <span id="uiNavResults" class="tab-label">4. Calificaciones</span>
                 </button>
             </nav>
         </div>
@@ -96,9 +96,14 @@
                 <div class="studio-card">
                     <div class="card-section-header">
                         <h2><i class="fa-solid fa-file-signature text-indigo"></i> <span id="uiExamConfigTitle">Configuración del Examen</span></h2>
-                        <button class="btn-mini" onclick="createNewBlankExam()">
-                            <i class="fa-solid fa-plus"></i> <span id="uiBtnNewExam">Nuevo</span>
-                        </button>
+                        <div style="display: flex; gap: 0.4rem;">
+                            <button type="button" class="btn-mini" onclick="duplicateCurrentExam()" title="Duplicar examen actual">
+                                <i class="fa-regular fa-copy"></i> <span id="uiBtnDuplicateExam">Duplicar</span>
+                            </button>
+                            <button type="button" class="btn-mini" onclick="createNewBlankExam()">
+                                <i class="fa-solid fa-plus"></i> <span id="uiBtnNewExam">Nuevo</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="form-group">
