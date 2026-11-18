@@ -1483,33 +1483,40 @@ function openPdfPreviewModal(cleanTitle, blobUrl, pdfInstance, copiesCount, pape
 }
 
 /* --------------------------------------------------------------------------
-   4. MOTOR ESCÁNER OMR (DETECCIÓN ÓPTICA DE BURBUJAS EN CANVAS + CÁMARA)
+   4. MOTOR ESCÁNER OMR CON DETECCIÓN DE 4 ESQUINAS (FIDUCIALS),
+      HOMOGRAFÍA DE PERSPECTIVA, AUTO-FORMATO Y RECORTE/OCR DE NOMBRE
    -------------------------------------------------------------------------- */
+
 function drawReferenceSheetOnScannerCanvas(withSimulatedStudent = false) {
     const canvas = document.getElementById('omrScannerCanvas');
     const ex = appState.activeExam;
     if (!canvas || !ex) return;
+
+    const styleMode = document.getElementById('sheetStyleModeSelect')?.value || 'full';
+    const isMinimal = styleMode === 'minimal';
 
     let simAnswers = null;
     if (withSimulatedStudent) {
         simAnswers = {};
         const allowed = LETTERS.slice(0, ex.optionsCount);
         for (let q = 1; q <= ex.questionCount; q++) {
-            if (Math.random() < 0.8) {
-                simAnswers[q] = ex.answers[q];
-            } else {
-                simAnswers[q] = allowed[Math.floor(Math.random() * allowed.length)];
-            }
+            simAnswers[q] = Math.random() < 0.8
+                ? ex.answers[q]
+                : allowed[Math.floor(Math.random() * allowed.length)];
         }
     }
 
-    drawOMRSheetToCanvas(canvas, ex, simAnswers);
+    drawOMRSheetToCanvas(canvas, ex, simAnswers, isMinimal);
 
     const snapshot = document.createElement('canvas');
     snapshot.width = canvas.width;
     snapshot.height = canvas.height;
     snapshot.getContext('2d').drawImage(canvas, 0, 0);
+
+    appState.scanner.rawPhotoCanvas = snapshot;
     appState.scanner.lastImageSource = snapshot;
+    appState.scanner.detectedSheetMinimal = isMinimal;
+    appState.scanner.fiducialCorners = null;
 
     if (withSimulatedStudent) {
         runOMRPixelAnalysis();
@@ -1521,7 +1528,8 @@ function generateSimulatedStudentScan() {
     drawReferenceSheetOnScannerCanvas(true);
     const names = ['Caroll Cuero', 'Sofía Martínez', 'Luis Fernando Ríos', 'Daniela Gómez', 'Mateo Vargas'];
     const randomName = names[Math.floor(Math.random() * names.length)];
-    document.getElementById('scannedStudentName').value = `${randomName} - ${appState.activeExam.course.split(' ')[0]}`;
+    document.getElementById('scannedStudentName').value = `${randomName} - ${appState.activeExam.course}`;
+    extractStudentNameStripFromAlignedCanvas();
     showToast(t('toastScanComplete'), 'fa-wand-magic-sparkles');
 }
 
@@ -1539,12 +1547,12 @@ async function toggleCameraStream() {
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 1600 } }
+            video: { facingMode: 'environment', width: { ideal: 1400 }, height: { ideal: 1800 } }
         });
         appState.scanner.stream = stream;
         video.srcObject = stream;
         video.classList.remove('hidden');
-        canvas.classList.add('hidden'); // <-- Oculta la imagen previa mientras apuntas con la cámara
+        canvas.classList.add('hidden');
         guide.classList.remove('hidden');
         btnCap.classList.remove('hidden');
         btnCam.textContent = t('btnCameraOff');
@@ -1559,7 +1567,7 @@ function stopCameraStream() {
         appState.scanner.stream = null;
     }
     document.getElementById('scannerVideo')?.classList.add('hidden');
-    document.getElementById('omrScannerCanvas')?.classList.remove('hidden'); // <-- Vuelve a mostrar el lienzo con el resultado
+    document.getElementById('omrScannerCanvas')?.classList.remove('hidden');
     document.getElementById('cameraGuideOverlay')?.classList.add('hidden');
     document.getElementById('btnCaptureFrame')?.classList.add('hidden');
     const btnCam = document.getElementById('uiBtnCameraToggle');
@@ -1568,20 +1576,15 @@ function stopCameraStream() {
 
 function captureFromVideoAndScan() {
     const video = document.getElementById('scannerVideo');
-    const canvas = document.getElementById('omrScannerCanvas');
-    if (!video || !canvas) return;
+    if (!video || !video.videoWidth) return;
 
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const snapshot = document.createElement('canvas');
-    snapshot.width = canvas.width;
-    snapshot.height = canvas.height;
-    snapshot.getContext('2d').drawImage(canvas, 0, 0);
-    appState.scanner.lastImageSource = snapshot;
+    const rawCanvas = document.createElement('canvas');
+    rawCanvas.width = video.videoWidth;
+    rawCanvas.height = video.videoHeight;
+    rawCanvas.getContext('2d').drawImage(video, 0, 0);
 
     stopCameraStream();
-    runOMRPixelAnalysis();
+    processRawPhotoThroughHomography(rawCanvas);
     showToast(t('toastScanComplete'), 'fa-camera');
 }
 
@@ -1592,23 +1595,350 @@ function handleSheetImageUpload(event) {
     stopCameraStream();
     const img = new Image();
     img.onload = () => {
-        const canvas = document.getElementById('omrScannerCanvas');
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const rawCanvas = document.createElement('canvas');
+        // Mantener buena resolución sin exceder 1600px para velocidad instantánea
+        const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+        rawCanvas.width = Math.round(img.width * scale);
+        rawCanvas.height = Math.round(img.height * scale);
+        rawCanvas.getContext('2d').drawImage(img, 0, 0, rawCanvas.width, rawCanvas.height);
 
-        const snapshot = document.createElement('canvas');
-        snapshot.width = canvas.width;
-        snapshot.height = canvas.height;
-        snapshot.getContext('2d').drawImage(canvas, 0, 0);
-        appState.scanner.lastImageSource = snapshot;
-
-        runOMRPixelAnalysis();
+        processRawPhotoThroughHomography(rawCanvas);
         showToast(t('toastScanComplete'), 'fa-file-image');
         event.target.value = '';
     };
     img.src = URL.createObjectURL(file);
+}
+
+/**
+ * PASO CLAVE 1: Detecta automáticamente los 4 cuadros negros (fiducial marks)
+ * en las esquinas de la hoja fotografiada usando umbral adaptativo local.
+ */
+function detectFiducialCornersInPhoto(rawCanvas) {
+    const W = rawCanvas.width;
+    const H = rawCanvas.height;
+    const ctx = rawCanvas.getContext('2d');
+    const imgData = ctx.getImageData(0, 0, W, H).data;
+
+    // 1. Convertir a luminancia y calcular imagen integral para umbral adaptativo rápido
+    const gray = new Uint8Array(W * H);
+    const integral = new Float64Array((W + 1) * (H + 1));
+
+    for (let y = 0; y < H; y++) {
+        let rowSum = 0;
+        for (let x = 0; x < W; x++) {
+            const idx = (y * W + x) * 4;
+            const luma = Math.round(0.299 * imgData[idx] + 0.587 * imgData[idx + 1] + 0.114 * imgData[idx + 2]);
+            gray[y * W + x] = luma;
+            rowSum += luma;
+            integral[(y + 1) * (W + 1) + (x + 1)] = integral[y * (W + 1) + (x + 1)] + rowSum;
+        }
+    }
+
+    function getLocalMean(x, y, radius) {
+        const x1 = Math.max(0, x - radius);
+        const y1 = Math.max(0, y - radius);
+        const x2 = Math.min(W - 1, x + radius);
+        const y2 = Math.min(H - 1, y + radius);
+        const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+        const sum = integral[(y2 + 1) * (W + 1) + (x2 + 1)]
+            - integral[y1 * (W + 1) + (x2 + 1)]
+            - integral[(y2 + 1) * (W + 1) + x1]
+            + integral[y1 * (W + 1) + x1];
+        return sum / count;
+    }
+
+    // 2. Binarizar píxeles significativamente más oscuros que su entorno local
+    const binary = new Uint8Array(W * H);
+    const winR = Math.max(16, Math.round(Math.min(W, H) * 0.04));
+    for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+            const mean = getLocalMean(x, y, winR);
+            binary[y * W + x] = (gray[y * W + x] < mean * 0.72 && gray[y * W + x] < 155) ? 1 : 0;
+        }
+    }
+
+    // 3. Etiquetado de componentes conexos (Blobs) para hallar candidatos a cuadros fiduciales
+    const visited = new Uint8Array(W * H);
+    const candidates = [];
+    const minSide = Math.max(6, Math.round(Math.min(W, H) * 0.010));
+    const maxSide = Math.round(Math.min(W, H) * 0.085);
+
+    const stackX = new Int32Array(W * H);
+    const stackY = new Int32Array(W * H);
+
+    for (let y = 4; y < H - 4; y += 2) {
+        for (let x = 4; x < W - 4; x += 2) {
+            const startIdx = y * W + x;
+            if (!binary[startIdx] || visited[startIdx]) continue;
+
+            let top = 0;
+            stackX[top] = x;
+            stackY[top] = y;
+            top++;
+            visited[startIdx] = 1;
+
+            let minX = x, maxX = x, minY = y, maxY = y;
+            let pixelCount = 0;
+
+            while (top > 0) {
+                top--;
+                const cx = stackX[top];
+                const cy = stackY[top];
+                pixelCount++;
+
+                if (cx < minX) minX = cx;
+                if (cx > maxX) maxX = cx;
+                if (cy < minY) minY = cy;
+                if (cy > maxY) maxY = cy;
+
+                const neighbors = [
+                    [cx - 1, cy], [cx + 1, cy],
+                    [cx, cy - 1], [cx, cy + 1]
+                ];
+                for (let n = 0; n < 4; n++) {
+                    const nx = neighbors[n][0];
+                    const ny = neighbors[n][1];
+                    if (nx >= 1 && nx < W - 1 && ny >= 1 && ny < H - 1) {
+                        const nIdx = ny * W + nx;
+                        if (binary[nIdx] && !visited[nIdx]) {
+                            visited[nIdx] = 1;
+                            stackX[top] = nx;
+                            stackY[top] = ny;
+                            top++;
+                        }
+                    }
+                }
+            }
+
+            const bw = maxX - minX + 1;
+            const bh = maxY - minY + 1;
+            if (bw < minSide || bh < minSide || bw > maxSide || bh > maxSide) continue;
+
+            const aspect = bw / bh;
+            if (aspect < 0.55 || aspect > 1.8) continue;
+
+            const bboxArea = bw * bh;
+            const fillRatio = pixelCount / bboxArea;
+            // Un cuadro fiducial negro sólido tiene un fillRatio alto (> 0.52)
+            if (fillRatio < 0.50) continue;
+
+            candidates.push({
+                cx: (minX + maxX) / 2,
+                cy: (minY + maxY) / 2,
+                w: bw,
+                h: bh,
+                area: bboxArea,
+                fill: fillRatio
+            });
+        }
+    }
+
+    if (candidates.length < 4) return null;
+
+    // 4. Elegir el mejor candidato en cada uno de los 4 cuadrantes de la hoja principal
+    function pickBestInQuadrant(filterFn, targetX, targetY) {
+        const list = candidates.filter(filterFn);
+        if (list.length === 0) return null;
+        list.sort((a, b) => {
+            const distA = Math.hypot(a.cx - targetX, a.cy - targetY);
+            const distB = Math.hypot(b.cx - targetX, b.cy - targetY);
+            // Priorizar cercanía a la esquina y solidez cuadrada
+            return (distA - a.fill * 40) - (distB - b.fill * 40);
+        });
+        return list[0];
+    }
+
+    // Si en la foto sale un pedazo de otra hoja a la derecha (como en tus capturas),
+    // evitamos irnos al borde derecho extremo si hay una columna divisoria antes.
+    const tl = pickBestInQuadrant(c => c.cx < W * 0.45 && c.cy < H * 0.40, W * 0.08, H * 0.08);
+    const bl = pickBestInQuadrant(c => c.cx < W * 0.45 && c.cy > H * 0.60, W * 0.08, H * 0.92);
+
+    // Para TR y BR buscamos que estén alineados verticalmente entre sí y formen un rectángulo coherente con TL y BL
+    const trCandidates = candidates.filter(c => c.cx > W * 0.45 && c.cy < H * 0.40);
+    const brCandidates = candidates.filter(c => c.cx > W * 0.45 && c.cy > H * 0.60);
+
+    let bestPair = null;
+    let bestPairScore = Infinity;
+
+    for (const trC of trCandidates) {
+        for (const brC of brCandidates) {
+            const dxRight = Math.abs(trC.cx - brC.cx);
+            if (dxRight > W * 0.15) continue; // TR y BR deben tener X parecido
+            let score = dxRight * 2;
+            if (tl) score += Math.abs(trC.cy - tl.cy) * 1.5;
+            if (bl) score += Math.abs(brC.cy - bl.cy) * 1.5;
+            if (tl && bl) {
+                const topW = trC.cx - tl.cx;
+                const botW = brC.cx - bl.cx;
+                score += Math.abs(topW - botW) * 2;
+            }
+            if (score < bestPairScore) {
+                bestPairScore = score;
+                bestPair = { tr: trC, br: brC };
+            }
+        }
+    }
+
+    const tr = bestPair ? bestPair.tr : pickBestInQuadrant(c => c.cx > W * 0.45 && c.cy < H * 0.40, W * 0.88, H * 0.08);
+    const br = bestPair ? bestPair.br : pickBestInQuadrant(c => c.cx > W * 0.45 && c.cy > H * 0.60, W * 0.88, H * 0.92);
+
+    if (!tl || !tr || !bl || !br) return null;
+
+    return {
+        tl: { x: tl.cx, y: tl.cy },
+        tr: { x: tr.cx, y: tr.cy },
+        bl: { x: bl.cx, y: bl.cy },
+        br: { x: br.cx, y: br.cy }
+    };
+}
+
+/**
+ * PASO CLAVE 2: Transforma (endereza) cualquier foto inclinada haciendo que los 4 cuadros
+ * negros detectados calcen exactamente con los 4 centros fiduciales del modelo OMR.
+ */
+function warpSheetPerspectiveToCanonical(rawCanvas, corners, destW, destH, isMinimal) {
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = destW;
+    outCanvas.height = destH;
+    const outCtx = outCanvas.getContext('2d');
+
+    const srcW = rawCanvas.width;
+    const srcH = rawCanvas.height;
+    const srcData = rawCanvas.getContext('2d').getImageData(0, 0, srcW, srcH).data;
+    const outImg = outCtx.createImageData(destW, destH);
+    const dstData = outImg.data;
+
+    // Coordenadas exactas donde están los centros de los 4 cuadros negros en nuestro modelo canónico
+    const s = Math.min(destW / 560, destH / 720);
+    const fSize = Math.round((isMinimal ? 14 : 20) * s);
+    const fMargin = Math.round((isMinimal ? 10 : 14) * s);
+
+    const dLeft = fMargin + fSize / 2;
+    const dRight = destW - fMargin - fSize / 2;
+    const dTop = fMargin + fSize / 2;
+    const dBottom = destH - fMargin - fSize / 2;
+
+    const spanW = dRight - dLeft;
+    const spanH = dBottom - dTop;
+
+    for (let y = 0; y < destH; y++) {
+        const v = (y - dTop) / spanH;
+        for (let x = 0; x < destW; x++) {
+            const u = (x - dLeft) / spanW;
+
+            // Interpolación bilineal proyectiva desde las 4 esquinas detectadas en la foto
+            const srcX = (1 - u) * (1 - v) * corners.tl.x
+                       + u * (1 - v) * corners.tr.x
+                       + (1 - u) * v * corners.bl.x
+                       + u * v * corners.br.x;
+
+            const srcY = (1 - u) * (1 - v) * corners.tl.y
+                       + u * (1 - v) * corners.tr.y
+                       + (1 - u) * v * corners.bl.y
+                       + u * v * corners.br.y;
+
+            const ix = Math.round(srcX);
+            const iy = Math.round(srcY);
+            const dstIdx = (y * destW + x) * 4;
+
+            if (ix >= 0 && ix < srcW && iy >= 0 && iy < srcH) {
+                const srcIdx = (iy * srcW + ix) * 4;
+                dstData[dstIdx] = srcData[srcIdx];
+                dstData[dstIdx + 1] = srcData[srcIdx + 1];
+                dstData[dstIdx + 2] = srcData[srcIdx + 2];
+                dstData[dstIdx + 3] = 255;
+            } else {
+                dstData[dstIdx] = 255;
+                dstData[dstIdx + 1] = 255;
+                dstData[dstIdx + 2] = 255;
+                dstData[dstIdx + 3] = 255;
+            }
+        }
+    }
+
+    outCtx.putImageData(outImg, 0, 0);
+    return outCanvas;
+}
+
+/**
+ * Evalúa qué tan bien calza la imagen enderezada con el formato Completo vs Simplificado
+ * midiendo el contraste de las burbujas respecto al fondo blanco entre columnas.
+ */
+function measureSheetFormatConfidence(warpedCanvas, ex, isMinimal) {
+    const ctx = warpedCanvas.getContext('2d');
+    const W = warpedCanvas.width;
+    const H = warpedCanvas.height;
+    const pixels = ctx.getImageData(0, 0, W, H).data;
+    const geom = getOMRBubbleGeometry(ex, W, H, isMinimal);
+    const activeLetters = LETTERS.slice(0, ex.optionsCount);
+
+    let ringDarknessSum = 0;
+    let ringSamples = 0;
+
+    for (let q = 1; q <= ex.questionCount; q++) {
+        activeLetters.forEach(letter => {
+            const { x, y, r } = geom.coords[q][letter];
+            // Muestrear el borde circular de cada burbuja (donde siempre hay tinta impresa del círculo)
+            for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+                const px = Math.round(x + Math.cos(angle) * r);
+                const py = Math.round(y + Math.sin(angle) * r);
+                if (px >= 0 && px < W && py >= 0 && py < H) {
+                    const idx = (py * W + px) * 4;
+                    const luma = (0.299 * pixels[idx] + 0.587 * pixels[idx + 1] + 0.114 * pixels[idx + 2]) / 255;
+                    ringDarknessSum += (1 - luma);
+                    ringSamples++;
+                }
+            }
+        });
+    }
+    return ringSamples > 0 ? (ringDarknessSum / ringSamples) : 0;
+}
+
+/**
+ * Procesa cualquier foto subida o capturada:
+ * 1) Detecta las 4 esquinas negras.
+ * 2) Auto-detecta si la hoja impresa es Formato Completo o Simplificado.
+ * 3) Endereza la perspectiva y califica.
+ */
+function processRawPhotoThroughHomography(rawCanvas) {
+    const destW = 700;
+    const destH = 920;
+    const ex = appState.activeExam;
+
+    appState.scanner.rawPhotoCanvas = rawCanvas;
+
+    let corners = detectFiducialCornersInPhoto(rawCanvas);
+    if (!corners) {
+        // Si la foto recortó alguna esquina negra, usar margen del 5% por defecto
+        corners = {
+            tl: { x: rawCanvas.width * 0.05, y: rawCanvas.height * 0.04 },
+            tr: { x: rawCanvas.width * 0.95, y: rawCanvas.height * 0.04 },
+            bl: { x: rawCanvas.width * 0.05, y: rawCanvas.height * 0.96 },
+            br: { x: rawCanvas.width * 0.95, y: rawCanvas.height * 0.96 }
+        };
+    }
+    appState.scanner.fiducialCorners = corners;
+
+    // Probar ambos formatos (Completo vs Simplificado) y elegir automáticamente el que mejor calza con los círculos impresos
+    const warpedFull = warpSheetPerspectiveToCanonical(rawCanvas, corners, destW, destH, false);
+    const warpedMin = warpSheetPerspectiveToCanonical(rawCanvas, corners, destW, destH, true);
+
+    const scoreFull = measureSheetFormatConfidence(warpedFull, ex, false);
+    const scoreMin = measureSheetFormatConfidence(warpedMin, ex, true);
+
+    const isMinimalDetected = scoreMin > scoreFull * 1.04;
+    appState.scanner.detectedSheetMinimal = isMinimalDetected;
+    appState.scanner.lastImageSource = isMinimalDetected ? warpedMin : warpedFull;
+
+    const statusBadge = document.getElementById('scanStatusBadge');
+    if (statusBadge) {
+        statusBadge.textContent = isMinimalDetected
+            ? 'Hoja Simplificada detectada (4 esquinas OK)'
+            : 'Hoja Completa ICFES detectada (4 esquinas OK)';
+    }
+
+    runOMRPixelAnalysis();
+    extractStudentNameStripFromAlignedCanvas();
 }
 
 function updateSensitivityLabel(val) {
@@ -1621,50 +1951,63 @@ function rescanCurrentCanvasImage() {
     runOMRPixelAnalysis();
 }
 
+/**
+ * Análisis óptico mejorado: compara la oscuridad relativa de cada burbuja dentro de la misma
+ * pregunta (normalización local por fila), por lo que funciona incluso con fotos oscuras o con sombra.
+ */
 function runOMRPixelAnalysis() {
     const canvas = document.getElementById('omrScannerCanvas');
     const ctx = canvas.getContext('2d');
     const ex = appState.activeExam;
     if (!canvas || !ex || !appState.scanner.lastImageSource) return;
 
+    const isMinimal = Boolean(appState.scanner.detectedSheetMinimal);
     ctx.drawImage(appState.scanner.lastImageSource, 0, 0);
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const pixels = imgData.data;
 
-    const geom = getOMRBubbleGeometry(ex, canvas.width, canvas.height);
+    const geom = getOMRBubbleGeometry(ex, canvas.width, canvas.height, isMinimal);
     const activeLetters = LETTERS.slice(0, ex.optionsCount);
-    const darknessThreshold = appState.scanner.threshold / 100;
+    const sensitivityRatio = appState.scanner.threshold / 100;
 
     const detected = {};
 
     for (let q = 1; q <= ex.questionCount; q++) {
         const darknessByLetter = {};
+        let minDark = 1;
+        let maxDark = 0;
 
         activeLetters.forEach(letter => {
             const { x, y, r } = geom.coords[q][letter];
-            let darkPixels = 0;
+            let lumaSum = 0;
             let totalSampled = 0;
-            const sampleR = r - 2;
+            const sampleR = Math.max(4, Math.round(r * 0.72));
 
             for (let dy = -sampleR; dy <= sampleR; dy++) {
                 for (let dx = -sampleR; dx <= sampleR; dx++) {
                     if (dx * dx + dy * dy <= sampleR * sampleR) {
                         const px = Math.round(x + dx);
                         const py = Math.round(y + dy);
-                        const idx = (py * canvas.width + px) * 4;
-                        const R = pixels[idx];
-                        const G = pixels[idx + 1];
-                        const B = pixels[idx + 2];
-                        const luma = (0.299 * R + 0.587 * G + 0.114 * B) / 255;
-                        totalSampled++;
-                        if (luma < 0.55) darkPixels++;
+                        if (px >= 0 && px < canvas.width && py >= 0 && py < canvas.height) {
+                            const idx = (py * canvas.width + px) * 4;
+                            const luma = (0.299 * pixels[idx] + 0.587 * pixels[idx + 1] + 0.114 * pixels[idx + 2]) / 255;
+                            lumaSum += (1 - luma); // 0 = blanco puro, 1 = negro puro
+                            totalSampled++;
+                        }
                     }
                 }
             }
-            darknessByLetter[letter] = totalSampled > 0 ? (darkPixels / totalSampled) : 0;
+            const avgDark = totalSampled > 0 ? (lumaSum / totalSampled) : 0;
+            darknessByLetter[letter] = avgDark;
+            if (avgDark < minDark) minDark = avgDark;
+            if (avgDark > maxDark) maxDark = avgDark;
         });
 
-        const markedLetters = activeLetters.filter(l => darknessByLetter[l] >= darknessThreshold);
+        // Una burbuja rellenada destaca claramente sobre las burbujas vacías de esa misma fila
+        const relativeDeltaCutoff = Math.max(0.06, sensitivityRatio * 0.32);
+        const markedLetters = activeLetters.filter(
+            l => (darknessByLetter[l] - minDark) >= relativeDeltaCutoff && darknessByLetter[l] >= minDark * 1.18
+        );
 
         if (markedLetters.length === 0) {
             detected[q] = 'BLANK';
@@ -1672,7 +2015,7 @@ function runOMRPixelAnalysis() {
             detected[q] = markedLetters[0];
         } else {
             markedLetters.sort((a, b) => darknessByLetter[b] - darknessByLetter[a]);
-            if (darknessByLetter[markedLetters[0]] - darknessByLetter[markedLetters[1]] > 0.22) {
+            if (darknessByLetter[markedLetters[0]] - darknessByLetter[markedLetters[1]] > 0.08) {
                 detected[q] = markedLetters[0];
             } else {
                 detected[q] = 'DOUBLE';
@@ -1690,11 +2033,24 @@ function drawOMRAuditOverlayAndScore() {
     const ex = appState.activeExam;
     if (!canvas || !ex) return;
 
+    const isMinimal = Boolean(appState.scanner.detectedSheetMinimal);
+
     if (appState.scanner.lastImageSource) {
         ctx.drawImage(appState.scanner.lastImageSource, 0, 0);
     }
 
-    const geom = getOMRBubbleGeometry(ex, canvas.width, canvas.height);
+    // Dibujar marcadores verdes sobre las 4 esquinas fiduciales alineadas
+    const s = Math.min(canvas.width / 560, canvas.height / 720);
+    const fSize = Math.round((isMinimal ? 14 : 20) * s);
+    const fMargin = Math.round((isMinimal ? 10 : 14) * s);
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(fMargin - 2, fMargin - 2, fSize + 4, fSize + 4);
+    ctx.strokeRect(canvas.width - fMargin - fSize - 2, fMargin - 2, fSize + 4, fSize + 4);
+    ctx.strokeRect(fMargin - 2, canvas.height - fMargin - fSize - 2, fSize + 4, fSize + 4);
+    ctx.strokeRect(canvas.width - fMargin - fSize - 2, canvas.height - fMargin - fSize - 2, fSize + 4, fSize + 4);
+
+    const geom = getOMRBubbleGeometry(ex, canvas.width, canvas.height, isMinimal);
     const detected = appState.scanner.detectedAnswers;
 
     let hits = 0;
@@ -1794,6 +2150,67 @@ function overrideScannedQuestion(qNum, newLetter) {
     const current = appState.scanner.detectedAnswers[qNum];
     appState.scanner.detectedAnswers[qNum] = current === newLetter ? 'BLANK' : newLetter;
     drawOMRAuditOverlayAndScore();
+}
+
+/**
+ * Extrae el recorte visual de la zona donde el estudiante escribió su nombre
+ * para mostrarlo encima del input y permitir OCR con 1 clic.
+ */
+function extractStudentNameStripFromAlignedCanvas() {
+    const src = appState.scanner.lastImageSource;
+    const cropBox = document.getElementById('studentNameCropBox');
+    const cropCanvas = document.getElementById('studentNameCropCanvas');
+    if (!src || !cropBox || !cropCanvas) return;
+
+    const isMinimal = Boolean(appState.scanner.detectedSheetMinimal);
+    const W = src.width;
+    const H = src.height;
+    const s = Math.min(W / 560, H / 720);
+
+    // Coordenadas exactas del renglón de Nombre según formato
+    const sx = Math.round(46 * s);
+    const sy = isMinimal ? Math.round(42 * s) : Math.round(92 * s);
+    const sw = isMinimal ? Math.round(350 * s) : Math.round(265 * s);
+    const sh = isMinimal ? Math.round(34 * s) : Math.round(46 * s);
+
+    cropBox.classList.remove('hidden');
+    const ctx = cropCanvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+    ctx.drawImage(src, sx, sy, sw, sh, 0, 0, cropCanvas.width, cropCanvas.height);
+}
+
+async function runHandwritingOcrOnCrop() {
+    const cropCanvas = document.getElementById('studentNameCropCanvas');
+    const btn = document.getElementById('btnRunNameOcr');
+    const nameInput = document.getElementById('scannedStudentName');
+    const ex = appState.activeExam;
+    if (!cropCanvas || !nameInput || !ex) return;
+
+    const prevHtml = btn ? btn.innerHTML : '';
+    if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Leyendo...`;
+
+    try {
+        await loadScriptOnce('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js', 'Tesseract');
+        const { data: { text } } = await window.Tesseract.recognize(cropCanvas, 'spa');
+        const cleaned = (text || '')
+            .replace(/NOMBRE\s*(COMPLETO)?\s*(DEL)?\s*(ESTUDIANTE)?\s*[:.]?/gi, '')
+            .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (cleaned.length >= 2) {
+            nameInput.value = `${cleaned} - ${ex.course}`;
+            showToast(`Nombre detectado: ${nameInput.value}`, 'fa-user-check');
+        } else {
+            nameInput.focus();
+            showToast('Texto manuscrito muy tenue. Puedes escribirlo mirando el recorte arriba.', 'fa-pen');
+        }
+    } catch (e) {
+        showToast('No se pudo cargar el motor OCR.', 'fa-circle-exclamation');
+    } finally {
+        if (btn) btn.innerHTML = prevHtml;
+    }
 }
 
 function saveScannedResultToGradebook() {
@@ -2894,6 +3311,7 @@ Object.assign(window, {
     handleImportJSON,
     openQrSyncHubModal,
     renderPrintableSheets,
+    runHandwritingOcrOnCrop,
     downloadSheetAsPNG,
     toggleCameraStream,
     captureFromVideoAndScan,

@@ -384,8 +384,21 @@
                     </div>
 
                     <!-- Datos del Estudiante para Registrar la Nota -->
+                     <!-- Recorte automático de la zona del Nombre escrito en la hoja + Botón OCR -->
+                    <div id="studentNameCropBox" class="hidden" style="margin-bottom: 0.75rem; background: var(--card-inner); border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.5rem 0.75rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                            <span class="text-muted-xs" style="font-weight:700;">
+                                <i class="fa-solid fa-signature text-indigo"></i> Firma / Nombre detectado en la hoja:
+                            </span>
+                            <button type="button" class="btn-mini" onclick="runHandwritingOcrOnCrop()" id="btnRunNameOcr" title="Intentar leer texto con OCR">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Leer texto (OCR)
+                            </button>
+                        </div>
+                        <canvas id="studentNameCropCanvas" width="460" height="58" style="width:100%; height:auto; border-radius:0.45rem; background:#fff; border:1px solid var(--border); display:block;"></canvas>
+                    </div>
                     <div class="form-row-2">
                         <div class="form-group">
+                            
                             <label for="scannedStudentName" id="uiLabelStudentName">Nombre del Estudiante</label>
                             <input type="text" id="scannedStudentName" placeholder="Ej. Caroll Lopez - 601">
                         </div>
