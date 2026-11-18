@@ -2181,11 +2181,20 @@ function handleImportJSON(event) {
 
 
 /* --------------------------------------------------------------------------
-   5.1 CENTRO DE SINCRONIZACIÓN QR BIDIRECCIONAL (PC ↔ CELULAR)
+   5.1 CENTRO DE SINCRONIZACIÓN QR BIDIRECCIONAL (PC ↔ CELULAR, 4G/WIFI & CÁMARA NATIVA)
    -------------------------------------------------------------------------- */
 let qrActiveStream = null;
 let qrActiveLoopId = null;
 let qrActivePeer = null;
+
+const PEER_ICE_CONFIG = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:cloudflare.com:3478' }
+    ]
+};
 
 function loadScriptOnce(url, globalName) {
     if (window[globalName]) return Promise.resolve(window[globalName]);
@@ -2225,12 +2234,12 @@ function cleanupQrSyncResources() {
 }
 
 function drawQrTextToElement(containerEl, textData) {
-    const qr = window.qrcode(0, 'M');
+    const qr = window.qrcode(0, 'L');
     qr.addData(textData);
     qr.make();
 
     const moduleCount = qr.getModuleCount();
-    const cellSize = Math.max(4, Math.min(7, Math.floor(230 / moduleCount)));
+    const cellSize = Math.max(3, Math.min(7, Math.floor(240 / moduleCount)));
     const margin = cellSize * 2;
     const size = moduleCount * cellSize + margin * 2;
 
@@ -2265,10 +2274,176 @@ function getCurrentBundleForSync() {
 }
 
 /**
- * Abre el Centro QR con 2 pestañas claras:
- * 1) Mostrar QR en esta pantalla (para Enviar datos o para Recibir datos desde el celular)
- * 2) Usar Cámara de este dispositivo para escanear el QR de la otra pantalla
+ * Empaqueta los exámenes en Base64 URL-safe para que quepan directo en el link del QR
  */
+function buildDirectQrDataParam() {
+    syncCurrentExamMeta();
+    const targetExams = appState.exams.length > 0 ? appState.exams : [appState.activeExam];
+    const compactExams = targetExams.map(ex => {
+        let ansStr = '';
+        for (let i = 1; i <= ex.questionCount; i++) ansStr += (ex.answers[i] || 'A');
+        return [
+            ex.id, ex.title, ex.course, ex.questionCount,
+            ex.optionsCount, ex.maxGrade, ex.minGrade, ansStr,
+            ex.updatedAt || new Date().toISOString().slice(0, 10)
+        ];
+    });
+    const jsonStr = JSON.stringify({ v: 1, e: compactExams });
+    return btoa(unescape(encodeURIComponent(jsonStr)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
+
+function decodeDirectQrDataParam(b64Param) {
+    let b64 = b64Param.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const parsed = JSON.parse(decodeURIComponent(escape(atob(b64))));
+    if (parsed && parsed.v === 1 && Array.isArray(parsed.e)) {
+        const restoredExams = parsed.e.map(arr => {
+            const [id, title, course, qCount, optCount, maxG, minG, ansStr, updatedAt] = arr;
+            const answers = {};
+            for (let i = 0; i < qCount; i++) answers[i + 1] = ansStr[i] || 'A';
+            return {
+                id: id || ('exam_' + Date.now()),
+                title: title || 'Examen QR',
+                course: course || 'General',
+                questionCount: Number(qCount) || 20,
+                optionsCount: Number(optCount) || 4,
+                maxGrade: Number(maxG) ?? 10,
+                minGrade: Number(minG) ?? 0,
+                answers,
+                updatedAt: updatedAt || new Date().toISOString().slice(0, 10)
+            };
+        });
+        return { exams: restoredExams, results: [] };
+    }
+    return null;
+}
+
+/**
+ * Construye una URL real para el QR (así funciona tanto con la cámara nativa del celular
+ * como con el escáner interno de UparGrade).
+ */
+function buildSyncUrl(paramsObj) {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const usp = new URLSearchParams(paramsObj);
+    return `${baseUrl}?${usp.toString()}`;
+}
+
+/**
+ * Conecta con el Peer remoto forzando serialization:'json' y servidores STUN
+ * para que funcione entre datos móviles (4.5G) y Wi-Fi sin quedarse en pantalla negra.
+ */
+function connectAndTransferWithPeer(peerId, mode, statusEl, onDoneCallback) {
+    const isEn = appState.lang === 'en';
+    if (statusEl) {
+        statusEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-indigo"></i> ${isEn ? 'Linking with PC (4G/Wi-Fi)...' : 'Enlazando con el PC (4G/Wi-Fi)...'}`;
+    }
+
+    cleanupQrSyncResources();
+    qrActivePeer = new window.Peer({ config: PEER_ICE_CONFIG });
+
+    let finished = false;
+    const timeoutId = setTimeout(() => {
+        if (!finished && statusEl) {
+            statusEl.innerHTML = `<span class="text-amber">${isEn ? 'Connection timed out. Try scanning again.' : 'Tiempo agotado. Verifica que el QR del PC siga abierto e intenta de nuevo.'}</span>`;
+        }
+    }, 14000);
+
+    qrActivePeer.on('open', () => {
+        const conn = qrActivePeer.connect(peerId, {
+            reliable: true,
+            serialization: 'json'
+        });
+
+        conn.on('open', () => {
+            if (mode === 'UPAR_P2P_RECEIVE') {
+                if (statusEl) statusEl.innerHTML = `<i class="fa-solid fa-paper-plane text-emerald"></i> ${isEn ? 'Sending data to PC...' : 'Enviando exámenes y calificaciones al PC...'}`;
+                conn.send({ type: 'UPAR_DATA_BUNDLE', payload: getCurrentBundleForSync() });
+            } else {
+                if (statusEl) statusEl.innerHTML = `<i class="fa-solid fa-download text-indigo"></i> ${isEn ? 'Receiving data from PC...' : 'Recibiendo datos desde el PC...'}`;
+                conn.send({ type: 'UPAR_REQUEST_BUNDLE' });
+            }
+        });
+
+        conn.on('data', (msg) => {
+            if (msg && msg.type === 'UPAR_DATA_BUNDLE' && msg.payload) {
+                finished = true;
+                clearTimeout(timeoutId);
+                cleanupQrSyncResources();
+                if (onDoneCallback) onDoneCallback();
+                promptImportModeModal((chosenMode) => {
+                    applyImportedData(msg.payload, chosenMode);
+                });
+            } else if (msg && msg.type === 'UPAR_ACK') {
+                finished = true;
+                clearTimeout(timeoutId);
+                showToast(isEn ? 'Data sent to PC successfully!' : '¡Datos recibidos en el PC correctamente!');
+                cleanupQrSyncResources();
+                if (onDoneCallback) onDoneCallback();
+            }
+        });
+
+        conn.on('error', () => {
+            clearTimeout(timeoutId);
+            if (statusEl) statusEl.textContent = isEn ? 'Transfer error.' : 'Error en la transferencia.';
+        });
+    });
+}
+
+/**
+ * Procesa cualquier QR leído (ya sea URL directa con ?qrdata=..., URL P2P con ?qrpeer=..., o JSON)
+ */
+function processScannedQrText(rawText, statusEl, closeOverlayFn) {
+    const isEn = appState.lang === 'en';
+    if (!rawText) return false;
+    const trimmed = rawText.trim();
+
+    try {
+        // Caso 1: Es una URL con parámetros (?qrdata=... o ?qrpeer=...)
+        if (trimmed.includes('qrdata=') || trimmed.includes('qrpeer=')) {
+            const urlObj = new URL(trimmed, window.location.origin);
+            const qrdata = urlObj.searchParams.get('qrdata');
+            const qrpeer = urlObj.searchParams.get('qrpeer');
+            const qrmode = urlObj.searchParams.get('qrmode') || 'UPAR_P2P_SEND';
+
+            // Si trae los exámenes incrustados directamente en el QR, importa instantáneamente
+            if (qrdata) {
+                const decoded = decodeDirectQrDataParam(qrdata);
+                if (decoded) {
+                    cleanupQrSyncResources();
+                    if (closeOverlayFn) closeOverlayFn();
+                    promptImportModeModal((chosenMode) => {
+                        applyImportedData(decoded, chosenMode);
+                    });
+                    return true;
+                }
+            }
+
+            // Si trae un canal P2P en vivo (ej. para enviar del celular al PC o grandes volúmenes)
+            if (qrpeer) {
+                connectAndTransferWithPeer(qrpeer, qrmode, statusEl, closeOverlayFn);
+                return true;
+            }
+        }
+
+        // Caso 2: Compatibilidad con el JSON anterior {"mode":"UPAR_P2P_SEND","peerId":"..."}
+        if (trimmed.startsWith('{')) {
+            const parsed = JSON.parse(trimmed);
+            if (parsed && parsed.peerId) {
+                connectAndTransferWithPeer(parsed.peerId, parsed.mode || 'UPAR_P2P_SEND', statusEl, closeOverlayFn);
+                return true;
+            }
+        }
+    } catch (err) {
+        console.warn('Error procesando QR:', err);
+    }
+
+    showToast(isEn ? 'Unrecognized QR code' : 'Código QR no reconocido', 'fa-triangle-exclamation');
+    return false;
+}
+
 async function openQrSyncHubModal() {
     cleanupQrSyncResources();
     const isEn = appState.lang === 'en';
@@ -2280,11 +2455,10 @@ async function openQrSyncHubModal() {
             <h3><i class="fa-solid fa-qrcode text-indigo"></i> ${isEn ? 'QR Sync (PC ↔ Phone)' : 'Sincronizar con QR (PC ↔ Celular)'}</h3>
             <p style="margin-bottom:0.8rem; font-size:0.78rem;">
                 ${isEn
-                    ? 'Transfer all your exams and grades between PC and Phone without cables using your phone camera.'
-                    : 'Pasa todos tus exámenes y calificaciones de PC a Celular o de Celular a PC usando siempre la cámara de tu teléfono.'}
+                    ? 'Works with your native phone camera or the in-app scanner.'
+                    : 'Funciona tanto con la cámara normal de tu teléfono como con el escáner interno.'}
             </p>
 
-            <!-- Selector de rol -->
             <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.4rem; margin-bottom:0.9rem;">
                 <button type="button" class="btn-utility" id="tabQrSendFromHere" style="justify-content:center; font-size:0.73rem; padding:0.45rem;">
                     <i class="fa-solid fa-upload text-indigo"></i> ${isEn ? '1. Send from here (QR)' : '1. Enviar de aquí (QR)'}
@@ -2298,7 +2472,7 @@ async function openQrSyncHubModal() {
             </div>
 
             <div id="qrHubBody" style="min-height:280px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-                <span class="text-muted-xs">${isEn ? 'Initializing QR channel...' : 'Iniciando canal QR...'}</span>
+                <span class="text-muted-xs">${isEn ? 'Preparing QR...' : 'Preparando QR...'}</span>
             </div>
 
             <div class="upar-modal-actions" style="margin-top:0.9rem;">
@@ -2322,48 +2496,70 @@ async function openQrSyncHubModal() {
         });
     }
 
-    // MODO 1: Mostrar QR en esta pantalla para ENVIAR datos al otro dispositivo (Ej. de PC a Celular)
+    // MODO 1: Enviar desde aquí (Incrusta los exámenes directo en el link del QR si caben + abre canal P2P de respaldo)
     async function startSendQrMode() {
         cleanupQrSyncResources();
         setActiveTabButton(btnTabSend);
-        bodyEl.innerHTML = `<span class="text-muted-xs">${isEn ? 'Creating transfer QR...' : 'Generando QR de envío...'}</span>`;
+        bodyEl.innerHTML = `<span class="text-muted-xs">${isEn ? 'Generating QR...' : 'Generando QR...'}</span>`;
 
         try {
             await ensureQrLibs(true);
+            const directDataB64 = buildDirectQrDataParam();
+
+            // Si el paquete compacto cabe en un QR estándar (< 1800 caracteres), usamos URL directa instantánea
+            if (directDataB64.length < 1800 && appState.results.length === 0) {
+                const directUrl = buildSyncUrl({ qrdata: directDataB64 });
+                bodyEl.innerHTML = `
+                    <div id="qrBoxRender" style="background:#fff; padding:12px; border-radius:0.9rem; border:2px solid var(--border); margin-bottom:0.55rem;"></div>
+                    <p style="font-size:0.76rem; font-weight:700; color:var(--accent-light); margin-bottom:0.2rem;">
+                        <i class="fa-solid fa-bolt"></i>
+                        ${isEn ? 'Instant QR Ready! Scan with Phone Camera or Tab 3' : '¡QR Instantáneo listo! Escanéalo con la Cámara del celular o con la Pestaña 3'}
+                    </p>
+                    <span class="text-muted-xs">${isEn ? 'Contains your saved exams directly inside the QR link.' : 'Incluye tus exámenes directo en el código (no requiere esperar conexión).'}</span>
+                `;
+                drawQrTextToElement(bodyEl.querySelector('#qrBoxRender'), directUrl);
+                return;
+            }
+
+            // Si incluye planilla de calificaciones grande, abrimos canal P2P con URL real
             const roomId = 'upar_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
-            qrActivePeer = new window.Peer(roomId);
+            qrActivePeer = new window.Peer(roomId, { config: PEER_ICE_CONFIG });
 
             qrActivePeer.on('open', (id) => {
-                const syncPayload = JSON.stringify({ mode: 'UPAR_P2P_SEND', peerId: id });
+                const p2pUrl = buildSyncUrl({ qrpeer: id, qrmode: 'UPAR_P2P_SEND' });
                 bodyEl.innerHTML = `
                     <div id="qrBoxRender" style="background:#fff; padding:12px; border-radius:0.9rem; border:2px solid var(--border); margin-bottom:0.55rem;"></div>
                     <p style="font-size:0.76rem; font-weight:700; color:var(--accent-light); margin-bottom:0.2rem;">
                         <i class="fa-solid fa-mobile-screen-button"></i>
-                        ${isEn ? 'On your Phone, tap "3. Scan with Camera" and point here' : 'En tu Celular pulsa "3. Escanear con Cámara" y apunta a este QR'}
+                        ${isEn ? 'Scan with your Phone Camera or Tab 3' : 'Escanéalo con la Cámara de tu Celular o desde la Pestaña 3'}
                     </p>
-                    <span id="qrStatusText" class="text-muted-xs">${isEn ? 'Waiting for phone to scan...' : 'Esperando que el celular escanee el código...'}</span>
+                    <span id="qrStatusText" class="text-muted-xs">${isEn ? 'Waiting for phone...' : 'Esperando conexión del celular...'}</span>
                 `;
-                drawQrTextToElement(bodyEl.querySelector('#qrBoxRender'), syncPayload);
+                drawQrTextToElement(bodyEl.querySelector('#qrBoxRender'), p2pUrl);
             });
 
             qrActivePeer.on('connection', (conn) => {
                 const statusEl = bodyEl.querySelector('#qrStatusText');
-                if (statusEl) statusEl.textContent = isEn ? 'Connected! Sending exams...' : '¡Celular conectado! Enviando datos...';
-                conn.on('open', () => {
+                if (statusEl) statusEl.textContent = isEn ? 'Connected! Sending data...' : '¡Conectado! Enviando exámenes y calificaciones...';
+                const sendBundle = () => {
                     conn.send({ type: 'UPAR_DATA_BUNDLE', payload: getCurrentBundleForSync() });
                     setTimeout(() => {
-                        showToast(isEn ? 'Data sent to phone successfully!' : '¡Datos enviados al otro dispositivo correctamente!');
+                        showToast(isEn ? 'Data sent successfully!' : '¡Datos enviados al otro dispositivo correctamente!');
                         cleanupQrSyncResources();
                         overlay.remove();
-                    }, 600);
+                    }, 700);
+                };
+                conn.on('open', sendBundle);
+                conn.on('data', (msg) => {
+                    if (msg && msg.type === 'UPAR_REQUEST_BUNDLE') sendBundle();
                 });
             });
         } catch (err) {
-            bodyEl.innerHTML = `<p class="text-amber">${isEn ? 'Connection error. Check internet access.' : 'No se pudo iniciar el canal QR. Verifica tu conexión.'}</p>`;
+            bodyEl.innerHTML = `<p class="text-amber">${isEn ? 'Connection error.' : 'Error al generar el QR.'}</p>`;
         }
     }
 
-    // MODO 2: Mostrar QR en esta pantalla para RECIBIR datos desde el celular (Ej. de Celular a PC)
+    // MODO 2: Mostrar QR en el PC para RECIBIR los datos que están en el celular
     async function startReceiveQrMode() {
         cleanupQrSyncResources();
         setActiveTabButton(btnTabReceive);
@@ -2372,22 +2568,24 @@ async function openQrSyncHubModal() {
         try {
             await ensureQrLibs(true);
             const roomId = 'upar_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
-            qrActivePeer = new window.Peer(roomId);
+            qrActivePeer = new window.Peer(roomId, { config: PEER_ICE_CONFIG });
 
             qrActivePeer.on('open', (id) => {
-                const syncPayload = JSON.stringify({ mode: 'UPAR_P2P_RECEIVE', peerId: id });
+                const receiveUrl = buildSyncUrl({ qrpeer: id, qrmode: 'UPAR_P2P_RECEIVE' });
                 bodyEl.innerHTML = `
                     <div id="qrBoxRender" style="background:#fff; padding:12px; border-radius:0.9rem; border:2px solid var(--border); margin-bottom:0.55rem;"></div>
                     <p style="font-size:0.76rem; font-weight:700; color:var(--emerald); margin-bottom:0.2rem;">
                         <i class="fa-solid fa-laptop"></i>
-                        ${isEn ? 'Scan this QR with your Phone ("3. Scan with Camera") to receive its data here' : 'En tu Celular abre "3. Escanear con Cámara" y apunta aquí para recibir los datos en este PC'}
+                        ${isEn ? 'Scan this QR with your Phone to receive its data here' : 'Escanea este QR con tu Celular para recibir sus datos en este PC'}
                     </p>
-                    <span id="qrStatusText" class="text-muted-xs">${isEn ? 'Waiting to receive data from phone...' : 'Esperando recibir los datos desde tu celular...'}</span>
+                    <span id="qrStatusText" class="text-muted-xs">${isEn ? 'Waiting for phone to send data...' : 'Esperando que el celular envíe los datos...'}</span>
                 `;
-                drawQrTextToElement(bodyEl.querySelector('#qrBoxRender'), syncPayload);
+                drawQrTextToElement(bodyEl.querySelector('#qrBoxRender'), receiveUrl);
             });
 
             qrActivePeer.on('connection', (conn) => {
+                const statusEl = bodyEl.querySelector('#qrStatusText');
+                if (statusEl) statusEl.textContent = isEn ? 'Receiving from phone...' : 'Recibiendo datos del celular...';
                 conn.on('data', (msg) => {
                     if (msg && msg.type === 'UPAR_DATA_BUNDLE' && msg.payload) {
                         conn.send({ type: 'UPAR_ACK' });
@@ -2400,22 +2598,24 @@ async function openQrSyncHubModal() {
                 });
             });
         } catch (err) {
-            bodyEl.innerHTML = `<p class="text-amber">${isEn ? 'Connection error.' : 'Error al crear el buzón receptor.'}</p>`;
+            bodyEl.innerHTML = `<p class="text-amber">${isEn ? 'Error creating receiver.' : 'Error al crear el receptor QR.'}</p>`;
         }
     }
 
-    // MODO 3: Abrir cámara en el celular para escanear el QR del PC (envía o recibe automáticamente según el QR)
+    // MODO 3: Escanear con la cámara dentro de la app (Mantiene el video visible y muestra estado claro)
     async function startCameraScanMode() {
         cleanupQrSyncResources();
         setActiveTabButton(btnTabScan);
 
         bodyEl.innerHTML = `
-            <div style="position:relative; width:100%; max-width:260px; aspect-ratio:1/1; background:#0f172a; border-radius:0.85rem; overflow:hidden; border:2px solid var(--border); margin-bottom:0.5rem;">
+            <div id="qrVideoBox" style="position:relative; width:100%; max-width:250px; aspect-ratio:1/1; background:#0f172a; border-radius:0.85rem; overflow:hidden; border:2px solid var(--border); margin-bottom:0.6rem; display:flex; align-items:center; justify-content:center;">
                 <video id="qrCamVideo" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
                 <canvas id="qrCamCanvas" class="hidden"></canvas>
                 <div style="position:absolute; inset:22px; border:2px dashed #10b981; border-radius:0.65rem; pointer-events:none;"></div>
             </div>
-            <span id="qrCamStatus" class="text-muted-xs">${isEn ? 'Point camera at the PC QR code...' : 'Apunta la cámara al código QR de la pantalla del PC...'}</span>
+            <div id="qrCamStatus" style="font-size:0.78rem; font-weight:700; color:var(--text-secondary);">
+                ${isEn ? 'Point your camera at the QR code...' : 'Apunta la cámara al código QR...'}
+            </div>
         `;
 
         const video = bodyEl.querySelector('#qrCamVideo');
@@ -2440,7 +2640,17 @@ async function openQrSyncHubModal() {
                     const code = window.jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' });
 
                     if (code && code.data) {
-                        handleScannedQrInstruction(code.data, statusEl);
+                        // Detener cámara y mostrar ícono de transferencia en lugar del cuadro negro vacío
+                        if (qrActiveLoopId) cancelAnimationFrame(qrActiveLoopId);
+                        if (qrActiveStream) {
+                            qrActiveStream.getTracks().forEach(tr => tr.stop());
+                            qrActiveStream = null;
+                        }
+                        const vBox = bodyEl.querySelector('#qrVideoBox');
+                        if (vBox) {
+                            vBox.innerHTML = `<div style="text-align:center; padding:1rem; color:#10b981;"><i class="fa-solid fa-circle-nodes fa-spin" style="font-size:2.5rem; margin-bottom:0.5rem;"></i><p style="font-size:0.78rem; color:#fff;">QR Detectado</p></div>`;
+                        }
+                        processScannedQrText(code.data, statusEl, () => overlay.remove());
                         return;
                     }
                 }
@@ -2448,52 +2658,7 @@ async function openQrSyncHubModal() {
             };
             qrActiveLoopId = requestAnimationFrame(tick);
         } catch (err) {
-            statusEl.textContent = isEn ? 'Could not access camera.' : 'No se pudo abrir la cámara en este dispositivo.';
-        }
-    }
-
-    function handleScannedQrInstruction(rawText, statusEl) {
-        try {
-            const parsed = JSON.parse(rawText);
-            if (!parsed || !parsed.peerId) throw new Error('Not a valid sync QR');
-
-            if (qrActiveLoopId) cancelAnimationFrame(qrActiveLoopId);
-            if (qrActiveStream) {
-                qrActiveStream.getTracks().forEach(tr => tr.stop());
-                qrActiveStream = null;
-            }
-
-            if (statusEl) statusEl.textContent = isEn ? 'Linking with PC...' : 'Conectando con el PC...';
-
-            qrActivePeer = new window.Peer();
-            qrActivePeer.on('open', () => {
-                const conn = qrActivePeer.connect(parsed.peerId, { reliable: true });
-
-                conn.on('open', () => {
-                    // Si el PC estaba en modo "Recibir aquí (2)", el celular le envía sus datos al PC
-                    if (parsed.mode === 'UPAR_P2P_RECEIVE') {
-                        if (statusEl) statusEl.textContent = isEn ? 'Sending data to PC...' : 'Enviando exámenes y notas al PC...';
-                        conn.send({ type: 'UPAR_DATA_BUNDLE', payload: getCurrentBundleForSync() });
-                    }
-                });
-
-                conn.on('data', (msg) => {
-                    // Si el PC estaba en modo "Enviar de aquí (1)", el celular recibe los datos del PC
-                    if (msg && msg.type === 'UPAR_DATA_BUNDLE' && msg.payload) {
-                        cleanupQrSyncResources();
-                        overlay.remove();
-                        promptImportModeModal((chosenMode) => {
-                            applyImportedData(msg.payload, chosenMode);
-                        });
-                    } else if (msg && msg.type === 'UPAR_ACK') {
-                        showToast(isEn ? 'Data transferred to PC!' : '¡Datos enviados al PC correctamente!');
-                        cleanupQrSyncResources();
-                        overlay.remove();
-                    }
-                });
-            });
-        } catch (e) {
-            showToast(isEn ? 'Unrecognized QR code' : 'Código QR no reconocido', 'fa-triangle-exclamation');
+            statusEl.textContent = isEn ? 'Could not access camera.' : 'No se pudo acceder a la cámara.';
         }
     }
 
@@ -2506,13 +2671,33 @@ async function openQrSyncHubModal() {
         overlay.remove();
     };
 
-    // Si se abre en celular, iniciar por defecto en pestaña 3 (Escanear); si es PC, en pestaña 1 (Enviar QR)
     const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (isMobileDevice) {
         startCameraScanMode();
     } else {
         startSendQrMode();
     }
+}
+
+/**
+ * Si el usuario escaneó el QR con la cámara nativa del celular y abrió el link,
+ * ejecuta automáticamente la recepción o envío sin que tenga que hacer nada más.
+ */
+async function checkIncomingQrUrlParam() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('qrdata') && !params.has('qrpeer')) return;
+
+    const fullHref = window.location.href;
+    params.delete('qrdata');
+    params.delete('qrpeer');
+    params.delete('qrmode');
+    const cleanSearch = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (cleanSearch ? `?${cleanSearch}` : ''));
+
+    await ensureQrLibs(true);
+    setTimeout(() => {
+        processScannedQrText(fullHref, null, null);
+    }, 300);
 }
 
 /* --------------------------------------------------------------------------
@@ -2732,6 +2917,7 @@ window.addEventListener('DOMContentLoaded', () => {
     renderSavedExamsList();
     applyTranslations();
     drawReferenceSheetOnScannerCanvas(true);
+    checkIncomingQrUrlParam();
 
     document.getElementById('btnThemeToggle').addEventListener('click', () => {
         appState.theme = appState.theme === 'dark' ? 'light' : 'dark';
