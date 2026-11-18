@@ -192,6 +192,9 @@
                             <button class="btn-utility" onclick="document.getElementById('importJsonFile').click()">
                                 <i class="fa-solid fa-file-import text-indigo"></i> <span id="uiBtnImportJson">Importar JSON</span>
                             </button>
+                            <button type="button" class="btn-utility" onclick="openQrSyncHubModal()" title="Pasar datos de PC a Celular o de Celular a PC con código QR">
+                                <i class="fa-solid fa-qrcode text-indigo"></i> <span id="uiBtnQrSync">Sincronizar QR</span>
+                            </button>
                             <input type="file" id="importJsonFile" accept=".json" class="hidden" onchange="handleImportJSON(event)">
                         </div>
                     </div>
@@ -245,8 +248,8 @@
 
                     <!-- Selector de Estilo de Hoja: Completa vs Simplificada (Solo esencial) -->
                     <select id="sheetStyleModeSelect" onchange="renderPrintableSheets()" title="Tipo de diseño de hoja">
-                        <option value="full" id="optStyleFull">Formato Completo ICFES</option>
-                        <option value="minimal" id="optStyleMinimal">Simplificada (Solo Esencial)</option>
+                        <option value="full" id="optStyleFull">Completo ICFES</option>
+                        <option value="minimal" id="optStyleMinimal">Simplificada</option>
                     </select>
 
                     <!-- Selector de Cantidad por Página (1 a 6) -->
@@ -257,19 +260,26 @@
                         <option value="6" id="optLayout6">6 por Hoja</option>
                     </select>
 
+                    <!-- Selector de Tamaño de Papel: Carta vs Oficio -->
+                    <select id="sheetPaperSizeSelect" onchange="renderPrintableSheets()" title="Tamaño de hoja para imprimir o descargar">
+                        <option value="letter" id="optPaperLetter" selected>Tamaño: Carta</option>
+                        <option value="legal" id="optPaperLegal">Tamaño: Oficio</option>
+                    </select>
+
                     <!-- Selector de Orientación de Página -->
                     <select id="sheetOrientationSelect" onchange="renderPrintableSheets()" title="Orientación de la hoja al imprimir">
                         <option value="auto" id="optOrientAuto">Orientación: Automática</option>
-                        <option value="portrait" id="optOrientPortrait">Vertical (Portrait)</option>
-                        <option value="landscape" id="optOrientLandscape">Horizontal (Landscape)</option>
+                        <option value="portrait" id="optOrientPortrait">Vertical</option>
+                        <option value="landscape" id="optOrientLandscape">Horizontal</option>
                     </select>
 
                     <button class="btn-utility" onclick="downloadSheetAsPNG()">
                         <i class="fa-solid fa-image text-indigo"></i> <span id="uiBtnDownloadSheetPng">Descargar PNG</span>
                     </button>
 
-                    <button class="btn-primary-md" onclick="window.print()">
-                        <i class="fa-solid fa-print"></i> <span id="uiBtnPrintSheetNow">Imprimir / Guardar PDF</span>
+                    <!-- <button class="btn-primary-md" onclick="window.print()"> -->
+                    <button class="btn-primary-md" onclick="printAnswerSheet()">
+                        <i class="fa-solid fa-print"></i> <span id="uiBtnPrintSheetNow">Generar PDF</span>
                     </button>
                 </div>
             </div>

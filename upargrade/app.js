@@ -24,7 +24,7 @@ const I18N = {
         navSheet: '2. Hoja ICFES',
         navScanner: '3. Escáner OMR',
         navResults: '4. Calificaciones',
-        btnPrintTop: 'Imprimir Hoja',
+        btnPrintTop: 'Generar PDF',
         examConfigTitle: 'Configuración del Examen',
         btnNewExam: 'Nuevo',
         btnDuplicateExam: 'Duplicar',
@@ -47,6 +47,9 @@ const I18N = {
         emptySavedExams: 'No hay exámenes guardados aún.',
         btnExportJson: 'Exportar JSON',
         btnImportJson: 'Importar JSON',
+        btnQrSync: 'Sincronizar QR',
+        // btnQrShare: 'Pasar con QR',
+        // btnQrScan: 'Leer QR',
         answerKeyTitle: 'Clave de Respuestas Correctas',
         answerKeySub: 'Marca la burbuja correcta para cada pregunta o pega una secuencia rápida.',
         placeholderQuickKey: 'Pegado rápido: ej. ABCDABCDAA...',
@@ -55,17 +58,19 @@ const I18N = {
         sheetPreviewTitle: 'Vista Previa de Hoja OMR Tipo ICFES',
         sheetPreviewSub: 'Elige entre el formato completo o el formato simplificado (hasta 6 hojas por página).',
         labelShowKeySheet: 'Hoja Guía Docente',
-        optStyleFull: 'Formato Completo ICFES',
-        optStyleMinimal: 'Simplificada (Solo Esencial)',
+        optStyleFull: 'Completo ICFES',
+        optStyleMinimal: 'Simplificada',
         optLayout1: '1 por Hoja',
         optLayout2: '2 por Hoja',
         optLayout4: '4 por Hoja',
         optLayout6: '6 por Hoja',
         optOrientAuto: 'Orientación: Automática',
-        optOrientPortrait: 'Vertical (Portrait)',
-        optOrientLandscape: 'Horizontal (Landscape)',
+        optOrientPortrait: 'Vertical',
+        optOrientLandscape: 'Horizontal',
+        optPaperLetter: 'Tamaño: Carta',
+        optPaperLegal: 'Tamaño: Oficio',
         btnDownloadSheetPng: 'Descargar PNG',
-        btnPrintSheetNow: 'Imprimir / Guardar PDF',
+        btnPrintSheetNow: 'Generar PDF',
         scannerTitle: 'Escáner Óptico de Hoja ICFES',
         scannerSub: 'Alinea los 4 cuadros negros de las esquinas de la hoja o sube una foto/captura.',
         btnCameraOn: 'Activar Cámara',
@@ -144,7 +149,7 @@ const I18N = {
         navSheet: '2. OMR Sheet',
         navScanner: '3. OMR Scanner',
         navResults: '4. Gradebook',
-        btnPrintTop: 'Print Sheet',
+        btnPrintTop: 'Generate PDF',
         examConfigTitle: 'Exam Configuration',
         btnNewExam: 'New',
         btnDuplicateExam: 'Duplicate',
@@ -167,6 +172,9 @@ const I18N = {
         emptySavedExams: 'No saved exams yet.',
         btnExportJson: 'Export JSON',
         btnImportJson: 'Import JSON',
+        btnQrSync: 'QR Sync',
+        // btnQrShare: 'Share via QR',
+        // btnQrScan: 'Scan QR',
         answerKeyTitle: 'Correct Answer Key',
         answerKeySub: 'Click the correct bubble for each question or paste a quick answer sequence.',
         placeholderQuickKey: 'Quick paste: e.g. ABCDABCDAA...',
@@ -175,17 +183,19 @@ const I18N = {
         sheetPreviewTitle: 'ICFES-Style OMR Answer Sheet Preview',
         sheetPreviewSub: 'Choose between full ICFES layout or simplified compact layout (up to 6 per page).',
         labelShowKeySheet: 'Teacher Key Sheet',
-        optStyleFull: 'Full ICFES Layout',
-        optStyleMinimal: 'Simplified (Essential Only)',
+        optStyleFull: 'Full ICFES',
+        optStyleMinimal: 'Simplified',
         optLayout1: '1 per Page',
         optLayout2: '2 per Page',
         optLayout4: '4 per Page',
         optLayout6: '6 per Page',
         optOrientAuto: 'Orientation: Auto',
-        optOrientPortrait: 'Portrait (Vertical)',
-        optOrientLandscape: 'Landscape (Horizontal)',
+        optOrientPortrait: 'Portrait',
+        optOrientLandscape: 'Landscape',
+        optPaperLetter: 'Size: Letter',
+        optPaperLegal: 'Size: Legal',
         btnDownloadSheetPng: 'Download PNG',
-        btnPrintSheetNow: 'Print / Save PDF',
+        btnPrintSheetNow: 'Generate PDF',
         scannerTitle: 'Optical OMR Sheet Scanner',
         scannerSub: 'Align the 4 black corner squares of the sheet or upload a photo/scan.',
         btnCameraOn: 'Start Camera',
@@ -738,6 +748,9 @@ function renderSavedExamsList() {
                 <p>${ex.course} • ${ex.questionCount} ${t('questionsShort')} (${ex.optionsCount} ${t('optionsShort')}) • ${t('scaleWord')} ${ex.minGrade} - ${ex.maxGrade}</p>
             </div>
             <div style="display:flex; gap:0.35rem;">
+                <button type="button" class="btn-mini" onclick="openQrSyncHubModal()" title="Sincronizar por QR">
+                    <i class="fa-solid fa-qrcode"></i>
+                </button>
                 <button type="button" class="btn-mini" onclick="loadSavedExam('${ex.id}')" title="Abrir">
                     <i class="fa-regular fa-folder-open"></i>
                 </button>
@@ -870,6 +883,10 @@ function buildSingleSheetHTML(ex, showTeacherKey, isMinimal, copiesCount) {
     `;
 }
 
+
+//BLOQUE CAMBIADO 5 FUNCIONES HASTA ANTES DE LA SESION 4 renderPrintableSheets a downloadSheetAsPNG//
+//FUNCION NUEVA getCleanExamFileName//
+
 function renderPrintableSheets() {
     const ex = appState.activeExam;
     const container = document.getElementById('printableAreaContainer');
@@ -878,17 +895,21 @@ function renderPrintableSheets() {
     const showKey = document.getElementById('showTeacherKeyOnSheet')?.checked || false;
     const styleMode = document.getElementById('sheetStyleModeSelect')?.value || 'full';
     const copiesCount = parseInt(document.getElementById('sheetPrintLayoutSelect')?.value, 10) || 1;
+    const paperSize = document.getElementById('sheetPaperSizeSelect')?.value || 'letter';
     const orientChoice = document.getElementById('sheetOrientationSelect')?.value || 'auto';
 
     const isMinimal = styleMode === 'minimal' || copiesCount >= 4;
     const finalOrientation = resolveBestOrientation(copiesCount, ex.questionCount, orientChoice);
 
+    // Configurar regla @page dinámica según Carta (letter) u Oficio (legal: 216mm x 330mm)
+    const cssSizeName = paperSize === 'legal' ? 'legal' : 'letter';
     const pageStyleEl = document.getElementById('dynamicPrintPageStyle');
     if (pageStyleEl) {
-        pageStyleEl.textContent = `@media print { @page { size: letter ${finalOrientation}; margin: 6mm; } }`;
+        pageStyleEl.textContent = `@media print { @page { size: ${cssSizeName} ${finalOrientation}; margin: 6mm; } }`;
     }
 
     container.className = 'printable-area-container';
+    container.dataset.paperSize = paperSize;
     if (copiesCount === 1) {
         container.classList.add('grid-1');
     } else {
@@ -899,98 +920,337 @@ function renderPrintableSheets() {
     container.innerHTML = Array.from({ length: copiesCount }, () => singleCardHtml).join('');
 }
 
-function printAnswerSheet() {
-    switchView('sheet');
-    setTimeout(() => window.print(), 200);
+function getCleanExamFileName(ex, prefix = '') {
+    const rawTitle = (ex?.title || 'Examen').trim();
+    const rawCourse = (ex?.course || '').trim();
+    const combined = rawCourse && !rawTitle.toLowerCase().includes(rawCourse.toLowerCase())
+        ? `${rawTitle} - ${rawCourse}`
+        : rawTitle;
+    return prefix ? `${prefix} - ${combined}` : combined;
 }
 
-function getOMRBubbleGeometry(ex, width = 700, height = 920) {
+/**
+ * Calcula la geometría proporcional sin deformar círculos ni textos,
+ * adaptándose a cualquier proporción de celda (1, 2, 4 o 6 por hoja).
+ */
+function getOMRBubbleGeometry(ex, width = 700, height = 920, isMinimal = false) {
+    const s = Math.min(width / 560, height / 720);
     const activeLetters = LETTERS.slice(0, ex.optionsCount);
-    const numCols = ex.questionCount > 30 ? 3 : 2;
+    const numCols = isMinimal
+        ? (ex.questionCount > 20 ? 3 : 2)
+        : (ex.questionCount > 30 ? 3 : 2);
     const perCol = Math.ceil(ex.questionCount / numCols);
 
-    const marginX = 52;
-    const startY = 235;
+    const marginX = Math.round((isMinimal ? 30 : 44) * s);
+    const startY = isMinimal
+        ? Math.round(92 * s)
+        : Math.round(198 * s);
+    const bottomPad = Math.round((isMinimal ? 26 : 38) * s);
+
     const availableW = width - marginX * 2;
-    const colWidth = (availableW - (numCols - 1) * 20) / numCols;
-    const rowHeight = Math.min(34, Math.floor((height - startY - 70) / perCol));
-    const bubbleRadius = 10;
+    const colGap = Math.round((isMinimal ? 12 : 18) * s);
+    const colWidth = (availableW - (numCols - 1) * colGap) / numCols;
+
+    const availH = Math.max(120, height - startY - bottomPad);
+    const rowHeight = Math.min(
+        Math.round((isMinimal ? 28 : 34) * s),
+        availH / perCol
+    );
+
+    const labelOffset = Math.round((isMinimal ? 32 : 44) * s);
+    const bubbleAreaW = Math.max(40, colWidth - labelOffset - Math.round(8 * s));
+    const bubbleSpacing = Math.min(
+        Math.round((isMinimal ? 25 : 32) * s),
+        bubbleAreaW / activeLetters.length
+    );
+
+    // El radio depende del menor entre fila y columna para que SIEMPRE sea un círculo perfecto
+    const bubbleRadius = Math.max(
+        5,
+        Math.min(
+            Math.round(rowHeight * 0.34),
+            Math.round(bubbleSpacing * 0.38),
+            Math.round(12 * s)
+        )
+    );
 
     const coords = {};
 
     for (let c = 0; c < numCols; c++) {
-        const colLeft = marginX + c * (colWidth + 20);
+        const colLeft = marginX + c * (colWidth + colGap);
         const startQ = c * perCol + 1;
         const endQ = Math.min((c + 1) * perCol, ex.questionCount);
 
         for (let q = startQ; q <= endQ; q++) {
             const rowIdx = q - startQ;
-            const cy = startY + 24 + rowIdx * rowHeight;
+            const cy = Math.round(startY + rowHeight * 0.55 + rowIdx * rowHeight);
             coords[q] = {};
 
-            const bubblesStartX = colLeft + 54;
-            const bubbleSpacing = Math.min(34, Math.floor((colWidth - 65) / activeLetters.length));
+            const bubblesStartX = Math.round(colLeft + labelOffset + bubbleRadius);
 
             activeLetters.forEach((letter, lIdx) => {
-                const cx = bubblesStartX + lIdx * bubbleSpacing;
+                const cx = Math.round(bubblesStartX + lIdx * bubbleSpacing);
                 coords[q][letter] = { x: cx, y: cy, r: bubbleRadius };
             });
         }
     }
 
-    return { coords, numCols, perCol, marginX, startY, colWidth, rowHeight };
+    return { coords, numCols, perCol, marginX, startY, colWidth, colGap, rowHeight, isMinimal, scale: s };
 }
 
-function drawOMRSheetToCanvas(canvas, ex, simulatedAnswers = null) {
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width;
-    const H = canvas.height;
+/**
+ * Dibuja una tarjeta OMR directamente en el rectángulo (offsetX, offsetY, W, H)
+ * usando vectores nítidos sin re-escalar imágenes.
+ */
+/**
+ * Auxiliar para dividir texto largo en varias líneas dentro de un ancho máximo en Canvas
+ */
+function wrapCanvasText(ctx, text, maxWidth) {
+    const words = String(text || '').split(' ');
+    const lines = [];
+    let currentLine = words[0] || '';
 
+    for (let i = 1; i < words.length; i++) {
+        const testLine = currentLine + ' ' + words[i];
+        if (ctx.measureText(testLine).width <= maxWidth) {
+            currentLine = testLine;
+        } else {
+            lines.push(currentLine);
+            currentLine = words[i];
+        }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines;
+}
+
+/**
+ * Dibuja una tarjeta OMR directamente en el rectángulo (offsetX, offsetY, W, H)
+ * replicando exactamente el diseño de la vista previa HTML sin desbordamientos.
+ */
+function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = null, isMinimal = false) {
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+
+    // Recortar cualquier exceso fuera de la tarjeta por seguridad
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.clip();
+
+    const s = Math.min(W / 560, H / 720);
+
+    // Fondo blanco de la tarjeta
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, W, H);
 
+    // Borde exterior de la tarjeta
+    ctx.strokeStyle = isMinimal ? '#64748b' : '#334155';
+    ctx.lineWidth = Math.max(1, 1.5 * s);
+    if (isMinimal) ctx.setLineDash([5 * s, 4 * s]);
+    ctx.strokeRect(2 * s, 2 * s, W - 4 * s, H - 4 * s);
+    ctx.setLineDash([]);
+
+    // 4 Marcas fiduciales negras en las esquinas
     ctx.fillStyle = '#000000';
-    const fSize = 24;
-    ctx.fillRect(18, 18, fSize, fSize);
-    ctx.fillRect(W - 18 - fSize, 18, fSize, fSize);
-    ctx.fillRect(18, H - 18 - fSize, fSize, fSize);
-    ctx.fillRect(W - 18 - fSize, H - 18 - fSize, fSize, fSize);
+    const fSize = Math.round((isMinimal ? 14 : 20) * s);
+    const fMargin = Math.round((isMinimal ? 10 : 14) * s);
+    ctx.fillRect(fMargin, fMargin, fSize, fSize);
+    ctx.fillRect(W - fMargin - fSize, fMargin, fSize, fSize);
+    ctx.fillRect(fMargin, H - fMargin - fSize, fSize, fSize);
+    ctx.fillRect(W - fMargin - fSize, H - fMargin - fSize, fSize, fSize);
 
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(52, 50, W - 104, 65);
+    const geom = getOMRBubbleGeometry(ex, W, H, isMinimal);
+    const mx = geom.marginX;
+    const innerW = W - mx * 2;
 
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 18px Inter, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(ex.title.toUpperCase(), 68, 78);
+    if (isMinimal) {
+        const headerY = fMargin + fSize + Math.round(12 * s);
+        ctx.fillStyle = '#000000';
+        ctx.font = `800 ${Math.max(9, Math.round(12 * s))}px Inter, sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
 
-    ctx.font = '600 12px Inter, sans-serif';
-    ctx.fillStyle = '#334155';
-    ctx.fillText(`${ex.course} • ${ex.questionCount} PREGUNTAS • NOTA MÁX: ${ex.maxGrade}`, 68, 100);
+        const rightTag = simulatedAnswers ? '★ KEY ★' : `${ex.questionCount}Q`;
+        const maxTitleW = innerW - ctx.measureText(rightTag).width - Math.round(12 * s);
+        let titleText = `${ex.title} (${ex.course})`;
+        while (ctx.measureText(titleText).width > maxTitleW && titleText.length > 8) {
+            titleText = titleText.slice(0, -2) + '…';
+        }
+        ctx.fillText(titleText, mx, headerY);
 
-    ctx.strokeRect(52, 128, W - 104, 48);
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 11px Inter, sans-serif';
-    ctx.fillText('ESTUDIANTE: ________________________________________   FECHA: ____________', 68, 157);
+        ctx.textAlign = 'right';
+        ctx.fillText(rightTag, W - mx, headerY);
 
-    ctx.fillStyle = '#f1f5f9';
-    ctx.fillRect(52, 186, W - 104, 28);
-    ctx.strokeRect(52, 186, W - 104, 28);
-    ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 11px Inter, sans-serif';
-    ctx.fillText('● Rellene completamente el círculo de su respuesta con lápiz oscuro o bolígrafo negro.', 66, 204);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = Math.max(1, 1.4 * s);
+        ctx.beginPath();
+        ctx.moveTo(mx, headerY + Math.round(5 * s));
+        ctx.lineTo(W - mx, headerY + Math.round(5 * s));
+        ctx.stroke();
 
-    const geom = getOMRBubbleGeometry(ex, W, H);
+        // Línea de Nombre y Nota con líneas dibujadas sin desbordar
+        const nameY = headerY + Math.round(23 * s);
+        ctx.textAlign = 'left';
+        ctx.font = `700 ${Math.max(8, Math.round(10.5 * s))}px Inter, sans-serif`;
+
+        const nameLbl = `${t('sheetStudentShort')} `;
+        const gradeLbl = `${t('sheetGradeLabel')} `;
+        const gradeBlockW = Math.round(78 * s);
+        const nameBlockEnd = W - mx - gradeBlockW - Math.round(10 * s);
+
+        ctx.fillText(nameLbl, mx, nameY);
+        const nameLineStart = mx + ctx.measureText(nameLbl).width + Math.round(3 * s);
+        ctx.lineWidth = Math.max(0.9, 1 * s);
+        ctx.beginPath();
+        ctx.moveTo(nameLineStart, nameY + Math.round(2 * s));
+        ctx.lineTo(nameBlockEnd, nameY + Math.round(2 * s));
+        ctx.stroke();
+
+        const gradeStartX = W - mx - gradeBlockW;
+        ctx.fillText(gradeLbl, gradeStartX, nameY);
+        const gradeLineStart = gradeStartX + ctx.measureText(gradeLbl).width + Math.round(3 * s);
+        ctx.beginPath();
+        ctx.moveTo(gradeLineStart, nameY + Math.round(2 * s));
+        ctx.lineTo(W - mx, nameY + Math.round(2 * s));
+        ctx.stroke();
+    } else {
+        // 1. CAJA SUPERIOR DE TÍTULO + RECUADRO DE CÓDIGO (20 Q | MAX: 10)
+        const boxTop = Math.round(34 * s);
+        const boxH = Math.round(48 * s);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = Math.max(1.2, 1.8 * s);
+        ctx.strokeRect(mx, boxTop, innerW, boxH);
+
+        // Recuadro derecho: "20 Q | MAX: 10"
+        const badgeText = `${ex.questionCount} Q | MAX: ${ex.maxGrade}`;
+        ctx.font = `800 ${Math.max(8, Math.round(10 * s))}px "JetBrains Mono", monospace`;
+        const badgePadX = Math.round(8 * s);
+        const badgeW = Math.ceil(ctx.measureText(badgeText).width + badgePadX * 2);
+        const badgeH = Math.round(22 * s);
+        const badgeX = W - mx - badgeW - Math.round(10 * s);
+        const badgeY = boxTop + Math.round((boxH - badgeH) / 2);
+
+        ctx.lineWidth = Math.max(1, 1.4 * s);
+        ctx.strokeRect(badgeX, badgeY, badgeW, badgeH);
+        ctx.fillStyle = '#000000';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 0.5 * s);
+
+        // Título y subtítulo a la izquierda (truncando si es muy largo para no chocar con el badge)
+        const maxLeftTextW = badgeX - (mx + Math.round(16 * s));
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillStyle = '#000000';
+        ctx.font = `800 ${Math.max(10, Math.round(14 * s))}px Inter, sans-serif`;
+        let mainTitle = ex.title.toUpperCase();
+        while (ctx.measureText(mainTitle).width > maxLeftTextW && mainTitle.length > 6) {
+            mainTitle = mainTitle.slice(0, -2) + '…';
+        }
+        ctx.fillText(mainTitle, mx + Math.round(12 * s), boxTop + Math.round(20 * s));
+
+        ctx.font = `600 ${Math.max(8, Math.round(10 * s))}px Inter, sans-serif`;
+        ctx.fillStyle = '#334155';
+        let subTitle = `${t('sheetHeaderTitle')} • ${ex.course}`;
+        while (ctx.measureText(subTitle).width > maxLeftTextW && subTitle.length > 8) {
+            subTitle = subTitle.slice(0, -2) + '…';
+        }
+        ctx.fillText(subTitle, mx + Math.round(12 * s), boxTop + Math.round(37 * s));
+
+        // 2. CAJA DE ESTUDIANTE / FECHA / NOTA (3 columnas con etiqueta arriba y línea abajo)
+        const stTop = boxTop + boxH + Math.round(8 * s);
+        const stH = Math.round(44 * s);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = Math.max(1, 1.4 * s);
+        ctx.strokeRect(mx, stTop, innerW, stH);
+
+        const padIn = Math.round(10 * s);
+        const colGapSt = Math.round(12 * s);
+        const usableStW = innerW - padIn * 2 - colGapSt * 2;
+        const wCol1 = Math.floor(usableStW * 0.50);
+        const wCol2 = Math.floor(usableStW * 0.25);
+        const wCol3 = usableStW - wCol1 - wCol2;
+
+        const xCol1 = mx + padIn;
+        const xCol2 = xCol1 + wCol1 + colGapSt;
+        const xCol3 = xCol2 + wCol2 + colGapSt;
+
+        const labelY = stTop + Math.round(15 * s);
+        const lineY = stTop + stH - Math.round(8 * s);
+
+        ctx.fillStyle = '#000000';
+        ctx.font = `700 ${Math.max(7.5, Math.round(9.2 * s))}px Inter, sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+
+        ctx.fillText(t('sheetStudentLabel'), xCol1, labelY);
+        ctx.fillText(t('sheetDateLabel'), xCol2, labelY);
+        ctx.fillText(t('sheetGradeLabel'), xCol3, labelY);
+
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = Math.max(0.9, 1.1 * s);
+        ctx.beginPath();
+        ctx.moveTo(xCol1, lineY);
+        ctx.lineTo(xCol1 + wCol1, lineY);
+        ctx.moveTo(xCol2, lineY);
+        ctx.lineTo(xCol2 + wCol2, lineY);
+        ctx.moveTo(xCol3, lineY);
+        ctx.lineTo(xCol3 + wCol3, lineY);
+        ctx.stroke();
+
+        // 3. BARRA DE INSTRUCCIONES (Con ajuste de línea automático + OMR-ICFES a la derecha)
+        const instTop = stTop + stH + Math.round(8 * s);
+        const instH = Math.round(32 * s);
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(mx, instTop, innerW, instH);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = Math.max(0.9, 1.1 * s);
+        ctx.strokeRect(mx, instTop, innerW, instH);
+
+        // Sello derecho "OMR-ICFES" o "★ KEY ★"
+        const rightStamp = simulatedAnswers ? '★ KEY ★' : 'OMR-ICFES';
+        ctx.fillStyle = '#0f172a';
+        ctx.font = `800 ${Math.max(7.5, Math.round(9 * s))}px Inter, sans-serif`;
+        const stampW = ctx.measureText(rightStamp).width + Math.round(14 * s);
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(rightStamp, W - mx - Math.round(10 * s), instTop + instH / 2);
+
+        // Texto de recomendación con salto de línea (máximo 2 líneas dentro del ancho disponible)
+        ctx.textAlign = 'left';
+        ctx.font = `600 ${Math.max(7.5, Math.round(8.8 * s))}px Inter, sans-serif`;
+        const maxInstTextW = innerW - stampW - Math.round(20 * s);
+        const wrappedLines = wrapCanvasText(ctx, `● ${t('sheetInstText')}`, maxInstTextW);
+
+        if (wrappedLines.length === 1) {
+            ctx.textBaseline = 'middle';
+            ctx.fillText(wrappedLines[0], mx + Math.round(10 * s), instTop + instH / 2);
+        } else {
+            ctx.textBaseline = 'alphabetic';
+            const line1Y = instTop + Math.round(13 * s);
+            const line2Y = instTop + Math.round(25 * s);
+            ctx.fillText(wrappedLines[0], mx + Math.round(10 * s), line1Y);
+            ctx.fillText(wrappedLines.slice(1).join(' '), mx + Math.round(10 * s), line2Y);
+        }
+    }
+
+    // 4. RECUADROS DE COLUMNAS Y BURBUJAS DE RESPUESTA
     const activeLetters = LETTERS.slice(0, ex.optionsCount);
+    const colBoxH = Math.round(geom.perCol * geom.rowHeight + 10 * s);
+
+    for (let c = 0; c < geom.numCols; c++) {
+        const colLeft = geom.marginX + c * (geom.colWidth + geom.colGap);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = Math.max(1, 1.2 * s);
+        ctx.strokeRect(colLeft, geom.startY - Math.round(4 * s), geom.colWidth, colBoxH);
+    }
 
     for (let q = 1; q <= ex.questionCount; q++) {
         const firstBubble = geom.coords[q]['A'];
         ctx.fillStyle = '#000000';
-        ctx.font = 'bold 13px monospace';
-        ctx.textAlign = 'left';
+        ctx.font = `800 ${Math.max(8, Math.round((isMinimal ? 10.5 : 12) * s))}px "JetBrains Mono", monospace`;
+        ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
-        ctx.fillText(String(q).padStart(2, '0') + '.', firstBubble.x - 42, firstBubble.y);
+        ctx.fillText(String(q).padStart(2, '0'), firstBubble.x - firstBubble.r - Math.round(8 * s), firstBubble.y);
 
         activeLetters.forEach(letter => {
             const b = geom.coords[q][letter];
@@ -998,32 +1258,228 @@ function drawOMRSheetToCanvas(canvas, ex, simulatedAnswers = null) {
 
             ctx.beginPath();
             ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-            ctx.fillStyle = isFilled ? '#1e293b' : '#ffffff';
+            ctx.fillStyle = isFilled ? '#0f172a' : '#ffffff';
             ctx.fill();
-            ctx.lineWidth = 1.8;
+            ctx.lineWidth = Math.max(1.1, 1.5 * s);
             ctx.strokeStyle = '#000000';
             ctx.stroke();
 
             ctx.fillStyle = isFilled ? '#ffffff' : '#000000';
-            ctx.font = 'bold 11px monospace';
+            ctx.font = `800 ${Math.max(7, Math.round(b.r * 0.92))}px "JetBrains Mono", monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(letter, b.x, b.y + 0.5);
+            ctx.fillText(letter, b.x, b.y + 0.5 * s);
         });
     }
+
+    ctx.restore();
+}
+
+function drawOMRSheetToCanvas(canvas, ex, simulatedAnswers = null, isMinimal = false) {
+    drawOMRSheetRegion(canvas.getContext('2d'), ex, 0, 0, canvas.width, canvas.height, simulatedAnswers, isMinimal);
+}
+
+/**
+ * Construye el Canvas maestro en ultra-alta definición (2400px, sin distorsión)
+ * para exportar tanto a PNG como a PDF con proporción exacta.
+ */
+function buildHighResSheetPageCanvas() {
+    const ex = appState.activeExam;
+    const showKey = document.getElementById('showTeacherKeyOnSheet')?.checked || false;
+    const styleMode = document.getElementById('sheetStyleModeSelect')?.value || 'full';
+    const copiesCount = parseInt(document.getElementById('sheetPrintLayoutSelect')?.value, 10) || 1;
+    const paperSize = document.getElementById('sheetPaperSizeSelect')?.value || 'letter';
+    const orientChoice = document.getElementById('sheetOrientationSelect')?.value || 'auto';
+
+    const isMinimal = styleMode === 'minimal' || copiesCount >= 4;
+    const finalOrientation = resolveBestOrientation(copiesCount, ex.questionCount, orientChoice);
+
+    // Resolución 300 DPI real sin deformación (Carta: 216x279mm, Oficio: 216x330mm)
+    const basePortraitW = 2160;
+    const basePortraitH = paperSize === 'legal' ? 3300 : 2790;
+
+    const pageW = finalOrientation === 'landscape' ? basePortraitH : basePortraitW;
+    const pageH = finalOrientation === 'landscape' ? basePortraitW : basePortraitH;
+
+    let cols = 1, rows = 1;
+    if (copiesCount === 2) {
+        if (finalOrientation === 'landscape') { cols = 2; rows = 1; }
+        else { cols = 1; rows = 2; }
+    } else if (copiesCount === 4) {
+        cols = 2; rows = 2;
+    } else if (copiesCount === 6) {
+        if (finalOrientation === 'landscape') { cols = 3; rows = 2; }
+        else { cols = 2; rows = 3; }
+    }
+
+    const masterCanvas = document.createElement('canvas');
+    masterCanvas.width = pageW;
+    masterCanvas.height = pageH;
+    const mCtx = masterCanvas.getContext('2d');
+
+    mCtx.fillStyle = '#ffffff';
+    mCtx.fillRect(0, 0, pageW, pageH);
+
+    const pad = 42;
+    const gap = 32;
+    const cellW = Math.floor((pageW - pad * 2 - (cols - 1) * gap) / cols);
+    const cellH = Math.floor((pageH - pad * 2 - (rows - 1) * gap) / rows);
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const dx = pad + c * (cellW + gap);
+            const dy = pad + r * (cellH + gap);
+            drawOMRSheetRegion(mCtx, ex, dx, dy, cellW, cellH, showKey ? ex.answers : null, isMinimal);
+        }
+    }
+
+    return { masterCanvas, copiesCount, paperSize, finalOrientation };
 }
 
 function downloadSheetAsPNG() {
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = 700;
-    tempCanvas.height = 920;
-    const showKey = document.getElementById('showTeacherKeyOnSheet')?.checked || false;
-    drawOMRSheetToCanvas(tempCanvas, appState.activeExam, showKey ? appState.activeExam.answers : null);
+    const ex = appState.activeExam;
+    if (!ex) return;
+
+    const { masterCanvas, copiesCount, paperSize } = buildHighResSheetPageCanvas();
+    const cleanFileName = getCleanExamFileName(ex);
 
     const a = document.createElement('a');
-    a.href = tempCanvas.toDataURL('image/png');
-    a.download = `hoja-icfes-${appState.activeExam.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`;
+    a.href = masterCanvas.toDataURL('image/png');
+    a.download = `${cleanFileName} (${copiesCount}x ${paperSize === 'legal' ? 'Oficio' : 'Carta'}).png`;
     a.click();
+}
+
+/**
+ * Carga jsPDF bajo demanda (0 impacto en Lighthouse inicial) y abre una ventana
+ * de Previsualización PDF con el nombre real del Examen + Grado para Descargar o Imprimir.
+ */
+async function ensureJsPdfLoaded() {
+    if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        script.onload = () => resolve(window.jspdf.jsPDF);
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+async function printAnswerSheet() {
+    switchView('sheet');
+    renderPrintableSheets();
+
+    const ex = appState.activeExam;
+    if (!ex) return;
+
+    const cleanTitle = getCleanExamFileName(ex);
+    const { masterCanvas, copiesCount, paperSize, finalOrientation } = buildHighResSheetPageCanvas();
+    const imgDataUrl = masterCanvas.toDataURL('image/jpeg', 0.95);
+
+    try {
+        const jsPDF = await ensureJsPdfLoaded();
+        // Tamaño exacto en milímetros: Carta (215.9 x 279.4) u Oficio (215.9 x 330.2)
+        const formatDims = paperSize === 'legal' ? [215.9, 330.2] : [215.9, 279.4];
+        const pdf = new jsPDF({
+            orientation: finalOrientation === 'landscape' ? 'l' : 'p',
+            unit: 'mm',
+            format: formatDims
+        });
+
+        const pdfW = pdf.internal.pageSize.getWidth();
+        const pdfH = pdf.internal.pageSize.getHeight();
+        pdf.setProperties({ title: cleanTitle });
+        pdf.addImage(imgDataUrl, 'JPEG', 0, 0, pdfW, pdfH);
+
+        const pdfBlob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(pdfBlob);
+
+        openPdfPreviewModal(cleanTitle, blobUrl, pdf, copiesCount, paperSize);
+    } catch (err) {
+        // Respaldo nativo cambiando también window.top.document.title si está en Suite
+        const prevTitle = document.title;
+        let prevTopTitle = null;
+        document.title = cleanTitle;
+        try {
+            if (window.top && window.top.document) {
+                prevTopTitle = window.top.document.title;
+                window.top.document.title = cleanTitle;
+            }
+        } catch (_) {}
+        window.print();
+        setTimeout(() => {
+            document.title = prevTitle;
+            try {
+                if (prevTopTitle && window.top && window.top.document) {
+                    window.top.document.title = prevTopTitle;
+                }
+            } catch (_) {}
+        }, 1000);
+    }
+}
+
+function openPdfPreviewModal(cleanTitle, blobUrl, pdfInstance, copiesCount, paperSize) {
+    const isEn = appState.lang === 'en';
+    const paperLabel = paperSize === 'legal' ? (isEn ? 'Legal' : 'Oficio') : (isEn ? 'Letter' : 'Carta');
+    const fileName = `${cleanTitle}.pdf`;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'upar-modal-overlay no-print';
+    overlay.innerHTML = `
+        <div class="upar-modal-box" style="max-width: 860px; width: 95%; padding: 1.25rem;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; gap:0.5rem; flex-wrap:wrap;">
+                <div style="text-align:left;">
+                    <h3 style="margin:0;"><i class="fa-solid fa-file-pdf text-indigo"></i> ${fileName}</h3>
+                    <p style="margin:0; font-size:0.75rem; color:var(--text-muted);">${copiesCount}x • ${paperLabel}</p>
+                </div>
+                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                    <button type="button" class="btn-primary-md" id="btnModalDownloadPdf">
+                        <i class="fa-solid fa-download"></i> ${isEn ? 'Download PDF' : 'Descargar PDF'}
+                    </button>
+                    <button type="button" class="btn-emerald-md" id="btnModalPrintNative">
+                        <i class="fa-solid fa-print"></i> ${isEn ? 'Print Now' : 'Imprimir Ahora'}
+                    </button>
+                    <button type="button" class="btn-utility" id="btnModalClosePdf">
+                        <i class="fa-solid fa-xmark"></i> ${isEn ? 'Close' : 'Cerrar'}
+                    </button>
+                </div>
+            </div>
+            <iframe src="${blobUrl}" title="${fileName}" style="width:100%; height:70vh; border:1px solid var(--border); border-radius:0.75rem; background:#fff;"></iframe>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#btnModalDownloadPdf').onclick = () => {
+        pdfInstance.save(fileName);
+    };
+
+    overlay.querySelector('#btnModalPrintNative').onclick = () => {
+        const prevTitle = document.title;
+        let prevTopTitle = null;
+        document.title = cleanTitle;
+        try {
+            if (window.top && window.top.document) {
+                prevTopTitle = window.top.document.title;
+                window.top.document.title = cleanTitle;
+            }
+        } catch (_) {}
+        overlay.remove();
+        setTimeout(() => {
+            window.print();
+            setTimeout(() => {
+                document.title = prevTitle;
+                try {
+                    if (prevTopTitle && window.top && window.top.document) {
+                        window.top.document.title = prevTopTitle;
+                    }
+                } catch (_) {}
+            }, 1000);
+        }, 150);
+    };
+
+    overlay.querySelector('#btnModalClosePdf').onclick = () => {
+        URL.revokeObjectURL(blobUrl);
+        overlay.remove();
+    };
 }
 
 /* --------------------------------------------------------------------------
@@ -1341,15 +1797,20 @@ function overrideScannedQuestion(qNum, newLetter) {
 }
 
 function saveScannedResultToGradebook() {
-    const studentName = document.getElementById('scannedStudentName').value.trim();
+    let studentName = document.getElementById('scannedStudentName').value.trim();
     if (!studentName) {
         showToast(t('toastStudentRequired'), 'fa-user-pen');
         document.getElementById('scannedStudentName').focus();
         return;
     }
 
-    const studentCode = document.getElementById('scannedStudentId').value.trim() || '---';
     const ex = appState.activeExam;
+    // Si el nombre escrito no incluye ya el grado/curso, anexarlo automáticamente
+    if (ex.course && !studentName.toLowerCase().includes(ex.course.toLowerCase())) {
+        studentName = `${studentName} - ${ex.course}`;
+    }
+
+    const studentCode = document.getElementById('scannedStudentId').value.trim() || '---';
     const detected = appState.scanner.detectedAnswers;
 
     let hits = 0;
@@ -1384,21 +1845,31 @@ function saveScannedResultToGradebook() {
 /* --------------------------------------------------------------------------
    5. PLANILLA DE CALIFICACIONES, EXPORTACIÓN CSV E IMPORTACIÓN JSON CON ELECCIÓN
    -------------------------------------------------------------------------- */
+   //FUNCION NUEVA getResultExamDisplayLabel, renderGradebookTable y clearGradebookForCurrentExam se modificaron para usar la nueva funcion//
+function getResultExamDisplayLabel(r) {
+    if (!r) return '';
+    const title = r.examTitle || '';
+    const course = r.course || '';
+    if (course && !title.toLowerCase().includes(course.toLowerCase())) {
+        return `${title} (${course})`;
+    }
+    return title;
+}
+
 function renderGradebookTable() {
     const filterSel = document.getElementById('resultsExamFilter');
     const searchVal = (document.getElementById('resultsStudentSearch')?.value || '').trim().toLowerCase();
     if (!filterSel) return;
 
     const currentFilter = filterSel.value || 'all';
-    const uniqueExams = [...new Set(appState.results.map(r => r.examTitle))];
+    const uniqueExamLabels = [...new Set(appState.results.map(r => getResultExamDisplayLabel(r)))];
     filterSel.innerHTML = `<option value="all">${t('filterAllExams')} (${appState.results.length})</option>` +
-        uniqueExams.map(title => `<option value="${title}" ${title === currentFilter ? 'selected' : ''}>${title}</option>`).join('');
+        uniqueExamLabels.map(label => `<option value="${label}" ${label === currentFilter ? 'selected' : ''}>${label}</option>`).join('');
 
     const filtered = appState.results
-        .filter(r => currentFilter === 'all' || r.examTitle === currentFilter)
+        .filter(r => currentFilter === 'all' || getResultExamDisplayLabel(r) === currentFilter)
         .filter(r => !searchVal || r.studentName.toLowerCase().includes(searchVal) || r.studentCode.toLowerCase().includes(searchVal));
 
-        // Tomar el porcentaje aprobatorio configurado globalmente (ej. 80%)
     const minPassPct = Math.round(getGlobalPassingRatio() * 100);
     updatePassingLabelsUI(minPassPct);
 
@@ -1421,12 +1892,13 @@ function renderGradebookTable() {
 
     tbody.innerHTML = filtered.map((r, idx) => {
         const badgeColor = r.percentage >= minPassPct ? 'text-emerald' : 'text-amber';
+        const fullExamLabel = getResultExamDisplayLabel(r);
         return `
             <tr>
                 <td class="font-mono">${idx + 1}</td>
                 <td><strong>${r.studentName}</strong></td>
                 <td class="font-mono">${r.studentCode}</td>
-                <td><span class="badge-soft">${r.examTitle}</span></td>
+                <td><span class="badge-soft">${fullExamLabel}</span></td>
                 <td class="font-mono">${r.hits} / ${r.totalQuestions}</td>
                 <td class="font-mono">${r.percentage}%</td>
                 <td class="font-mono ${badgeColor}"><strong>${r.grade.toFixed(2)}</strong> <span style="font-size:0.7rem;color:var(--text-muted);">/ ${r.maxGrade}</span></td>
@@ -1437,6 +1909,63 @@ function renderGradebookTable() {
             </tr>
         `;
     }).join('');
+}
+
+function clearGradebookForCurrentExam() {
+    if (appState.results.length === 0) return;
+
+    const filterSel = document.getElementById('resultsExamFilter');
+    const selectedExamLabel = filterSel ? filterSel.value : 'all';
+    const isAllSelected = !selectedExamLabel || selectedExamLabel === 'all';
+
+    const targetRecords = isAllSelected
+        ? appState.results
+        : appState.results.filter(r => getResultExamDisplayLabel(r) === selectedExamLabel);
+
+    if (targetRecords.length === 0) return;
+
+    const titleText = isAllSelected
+        ? t('modalClearAllTitle')
+        : t('modalClearExamTitle');
+
+    const descHtml = isAllSelected
+        ? t('modalClearAllDesc')(targetRecords.length)
+        : t('modalClearExamDesc')(selectedExamLabel, targetRecords.length);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'upar-modal-overlay';
+    overlay.innerHTML = `
+        <div class="upar-modal-box">
+            <h3><i class="fa-solid fa-triangle-exclamation text-amber"></i> ${titleText}</h3>
+            <p>${descHtml}</p>
+            <div class="upar-modal-actions">
+                <button type="button" class="btn-utility" id="btnCancelClearGrades">
+                    ${t('btnImportCancel')}
+                </button>
+                <button type="button" class="btn-danger-sm" id="btnAcceptClearGrades">
+                    <i class="fa-regular fa-trash-can"></i> ${t('btnConfirmClearGrades')}
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#btnCancelClearGrades').onclick = () => {
+        overlay.remove();
+    };
+
+    overlay.querySelector('#btnAcceptClearGrades').onclick = () => {
+        overlay.remove();
+        if (isAllSelected) {
+            appState.results = [];
+            showToast(t('toastClearedAllGrades'), 'fa-trash-can');
+        } else {
+            appState.results = appState.results.filter(r => getResultExamDisplayLabel(r) !== selectedExamLabel);
+            showToast(t('toastClearedExamGrades')(selectedExamLabel), 'fa-trash-can');
+        }
+        saveResultsToStorage();
+        renderGradebookTable();
+    };
 }
 
 function deleteSingleResult(resId) {
@@ -1486,64 +2015,6 @@ function deleteSingleResult(resId) {
         saveResultsToStorage();
         renderGradebookTable();
         showToast(toastMsg, 'fa-trash-can');
-    };
-}
-
-function clearGradebookForCurrentExam() {
-    if (appState.results.length === 0) return;
-
-    const filterSel = document.getElementById('resultsExamFilter');
-    const selectedExamTitle = filterSel ? filterSel.value : 'all';
-    const isAllSelected = !selectedExamTitle || selectedExamTitle === 'all';
-
-    // Contar cuántos registros se verán afectados según el filtro actual
-    const targetRecords = isAllSelected
-        ? appState.results
-        : appState.results.filter(r => r.examTitle === selectedExamTitle);
-
-    if (targetRecords.length === 0) return;
-
-    const titleText = isAllSelected
-        ? t('modalClearAllTitle')
-        : t('modalClearExamTitle');
-
-    const descHtml = isAllSelected
-        ? t('modalClearAllDesc')(targetRecords.length)
-        : t('modalClearExamDesc')(selectedExamTitle, targetRecords.length);
-
-    const overlay = document.createElement('div');
-    overlay.className = 'upar-modal-overlay';
-    overlay.innerHTML = `
-        <div class="upar-modal-box">
-            <h3><i class="fa-solid fa-triangle-exclamation text-amber"></i> ${titleText}</h3>
-            <p>${descHtml}</p>
-            <div class="upar-modal-actions">
-                <button type="button" class="btn-utility" id="btnCancelClearGrades">
-                    ${t('btnImportCancel')}
-                </button>
-                <button type="button" class="btn-danger-sm" id="btnAcceptClearGrades">
-                    <i class="fa-regular fa-trash-can"></i> ${t('btnConfirmClearGrades')}
-                </button>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-
-    overlay.querySelector('#btnCancelClearGrades').onclick = () => {
-        overlay.remove();
-    };
-
-    overlay.querySelector('#btnAcceptClearGrades').onclick = () => {
-        overlay.remove();
-        if (isAllSelected) {
-            appState.results = [];
-            showToast(t('toastClearedAllGrades'), 'fa-trash-can');
-        } else {
-            appState.results = appState.results.filter(r => r.examTitle !== selectedExamTitle);
-            showToast(t('toastClearedExamGrades')(selectedExamTitle), 'fa-trash-can');
-        }
-        saveResultsToStorage();
-        renderGradebookTable();
     };
 }
 
@@ -1708,6 +2179,342 @@ function handleImportJSON(event) {
     reader.readAsText(file);
 }
 
+
+/* --------------------------------------------------------------------------
+   5.1 CENTRO DE SINCRONIZACIÓN QR BIDIRECCIONAL (PC ↔ CELULAR)
+   -------------------------------------------------------------------------- */
+let qrActiveStream = null;
+let qrActiveLoopId = null;
+let qrActivePeer = null;
+
+function loadScriptOnce(url, globalName) {
+    if (window[globalName]) return Promise.resolve(window[globalName]);
+    return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = url;
+        s.onload = () => resolve(window[globalName]);
+        s.onerror = reject;
+        document.head.appendChild(s);
+    });
+}
+
+function ensureQrLibs(needPeer = false) {
+    const promises = [
+        loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js', 'qrcode'),
+        loadScriptOnce('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js', 'jsQR')
+    ];
+    if (needPeer) {
+        promises.push(loadScriptOnce('https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'Peer'));
+    }
+    return Promise.all(promises);
+}
+
+function cleanupQrSyncResources() {
+    if (qrActiveLoopId) {
+        cancelAnimationFrame(qrActiveLoopId);
+        qrActiveLoopId = null;
+    }
+    if (qrActiveStream) {
+        qrActiveStream.getTracks().forEach(tr => tr.stop());
+        qrActiveStream = null;
+    }
+    if (qrActivePeer) {
+        try { qrActivePeer.destroy(); } catch (_) {}
+        qrActivePeer = null;
+    }
+}
+
+function drawQrTextToElement(containerEl, textData) {
+    const qr = window.qrcode(0, 'M');
+    qr.addData(textData);
+    qr.make();
+
+    const moduleCount = qr.getModuleCount();
+    const cellSize = Math.max(4, Math.min(7, Math.floor(230 / moduleCount)));
+    const margin = cellSize * 2;
+    const size = moduleCount * cellSize + margin * 2;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#0f172a';
+
+    for (let r = 0; r < moduleCount; r++) {
+        for (let c = 0; c < moduleCount; c++) {
+            if (qr.isDark(r, c)) {
+                ctx.fillRect(margin + c * cellSize, margin + r * cellSize, cellSize, cellSize);
+            }
+        }
+    }
+    containerEl.innerHTML = '';
+    containerEl.appendChild(canvas);
+}
+
+function getCurrentBundleForSync() {
+    syncCurrentExamMeta();
+    return {
+        app: 'UparGrade Studio',
+        exportedAt: new Date().toISOString(),
+        exams: appState.exams,
+        results: appState.results
+    };
+}
+
+/**
+ * Abre el Centro QR con 2 pestañas claras:
+ * 1) Mostrar QR en esta pantalla (para Enviar datos o para Recibir datos desde el celular)
+ * 2) Usar Cámara de este dispositivo para escanear el QR de la otra pantalla
+ */
+async function openQrSyncHubModal() {
+    cleanupQrSyncResources();
+    const isEn = appState.lang === 'en';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'upar-modal-overlay no-print';
+    overlay.innerHTML = `
+        <div class="upar-modal-box" style="max-width: 500px; width: 95%;">
+            <h3><i class="fa-solid fa-qrcode text-indigo"></i> ${isEn ? 'QR Sync (PC ↔ Phone)' : 'Sincronizar con QR (PC ↔ Celular)'}</h3>
+            <p style="margin-bottom:0.8rem; font-size:0.78rem;">
+                ${isEn
+                    ? 'Transfer all your exams and grades between PC and Phone without cables using your phone camera.'
+                    : 'Pasa todos tus exámenes y calificaciones de PC a Celular o de Celular a PC usando siempre la cámara de tu teléfono.'}
+            </p>
+
+            <!-- Selector de rol -->
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0.4rem; margin-bottom:0.9rem;">
+                <button type="button" class="btn-utility" id="tabQrSendFromHere" style="justify-content:center; font-size:0.73rem; padding:0.45rem;">
+                    <i class="fa-solid fa-upload text-indigo"></i> ${isEn ? '1. Send from here (QR)' : '1. Enviar de aquí (QR)'}
+                </button>
+                <button type="button" class="btn-utility" id="tabQrReceiveHere" style="justify-content:center; font-size:0.73rem; padding:0.45rem;">
+                    <i class="fa-solid fa-download text-emerald"></i> ${isEn ? '2. Receive here (QR)' : '2. Recibir aquí (QR)'}
+                </button>
+                <button type="button" class="btn-utility" id="tabQrCameraScan" style="justify-content:center; font-size:0.73rem; padding:0.45rem;">
+                    <i class="fa-solid fa-camera text-amber"></i> ${isEn ? '3. Scan with Camera' : '3. Escanear con Cámara'}
+                </button>
+            </div>
+
+            <div id="qrHubBody" style="min-height:280px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                <span class="text-muted-xs">${isEn ? 'Initializing QR channel...' : 'Iniciando canal QR...'}</span>
+            </div>
+
+            <div class="upar-modal-actions" style="margin-top:0.9rem;">
+                <button type="button" class="btn-utility" id="btnCloseQrHub">
+                    ${t('btnImportCancel')}
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const bodyEl = overlay.querySelector('#qrHubBody');
+    const btnTabSend = overlay.querySelector('#tabQrSendFromHere');
+    const btnTabReceive = overlay.querySelector('#tabQrReceiveHere');
+    const btnTabScan = overlay.querySelector('#tabQrCameraScan');
+
+    function setActiveTabButton(activeBtn) {
+        [btnTabSend, btnTabReceive, btnTabScan].forEach(b => {
+            b.style.borderColor = b === activeBtn ? 'var(--accent-light)' : 'var(--border)';
+            b.style.background = b === activeBtn ? 'var(--accent-soft)' : 'var(--card)';
+        });
+    }
+
+    // MODO 1: Mostrar QR en esta pantalla para ENVIAR datos al otro dispositivo (Ej. de PC a Celular)
+    async function startSendQrMode() {
+        cleanupQrSyncResources();
+        setActiveTabButton(btnTabSend);
+        bodyEl.innerHTML = `<span class="text-muted-xs">${isEn ? 'Creating transfer QR...' : 'Generando QR de envío...'}</span>`;
+
+        try {
+            await ensureQrLibs(true);
+            const roomId = 'upar_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+            qrActivePeer = new window.Peer(roomId);
+
+            qrActivePeer.on('open', (id) => {
+                const syncPayload = JSON.stringify({ mode: 'UPAR_P2P_SEND', peerId: id });
+                bodyEl.innerHTML = `
+                    <div id="qrBoxRender" style="background:#fff; padding:12px; border-radius:0.9rem; border:2px solid var(--border); margin-bottom:0.55rem;"></div>
+                    <p style="font-size:0.76rem; font-weight:700; color:var(--accent-light); margin-bottom:0.2rem;">
+                        <i class="fa-solid fa-mobile-screen-button"></i>
+                        ${isEn ? 'On your Phone, tap "3. Scan with Camera" and point here' : 'En tu Celular pulsa "3. Escanear con Cámara" y apunta a este QR'}
+                    </p>
+                    <span id="qrStatusText" class="text-muted-xs">${isEn ? 'Waiting for phone to scan...' : 'Esperando que el celular escanee el código...'}</span>
+                `;
+                drawQrTextToElement(bodyEl.querySelector('#qrBoxRender'), syncPayload);
+            });
+
+            qrActivePeer.on('connection', (conn) => {
+                const statusEl = bodyEl.querySelector('#qrStatusText');
+                if (statusEl) statusEl.textContent = isEn ? 'Connected! Sending exams...' : '¡Celular conectado! Enviando datos...';
+                conn.on('open', () => {
+                    conn.send({ type: 'UPAR_DATA_BUNDLE', payload: getCurrentBundleForSync() });
+                    setTimeout(() => {
+                        showToast(isEn ? 'Data sent to phone successfully!' : '¡Datos enviados al otro dispositivo correctamente!');
+                        cleanupQrSyncResources();
+                        overlay.remove();
+                    }, 600);
+                });
+            });
+        } catch (err) {
+            bodyEl.innerHTML = `<p class="text-amber">${isEn ? 'Connection error. Check internet access.' : 'No se pudo iniciar el canal QR. Verifica tu conexión.'}</p>`;
+        }
+    }
+
+    // MODO 2: Mostrar QR en esta pantalla para RECIBIR datos desde el celular (Ej. de Celular a PC)
+    async function startReceiveQrMode() {
+        cleanupQrSyncResources();
+        setActiveTabButton(btnTabReceive);
+        bodyEl.innerHTML = `<span class="text-muted-xs">${isEn ? 'Creating receiver QR...' : 'Generando QR para recibir desde el celular...'}</span>`;
+
+        try {
+            await ensureQrLibs(true);
+            const roomId = 'upar_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+            qrActivePeer = new window.Peer(roomId);
+
+            qrActivePeer.on('open', (id) => {
+                const syncPayload = JSON.stringify({ mode: 'UPAR_P2P_RECEIVE', peerId: id });
+                bodyEl.innerHTML = `
+                    <div id="qrBoxRender" style="background:#fff; padding:12px; border-radius:0.9rem; border:2px solid var(--border); margin-bottom:0.55rem;"></div>
+                    <p style="font-size:0.76rem; font-weight:700; color:var(--emerald); margin-bottom:0.2rem;">
+                        <i class="fa-solid fa-laptop"></i>
+                        ${isEn ? 'Scan this QR with your Phone ("3. Scan with Camera") to receive its data here' : 'En tu Celular abre "3. Escanear con Cámara" y apunta aquí para recibir los datos en este PC'}
+                    </p>
+                    <span id="qrStatusText" class="text-muted-xs">${isEn ? 'Waiting to receive data from phone...' : 'Esperando recibir los datos desde tu celular...'}</span>
+                `;
+                drawQrTextToElement(bodyEl.querySelector('#qrBoxRender'), syncPayload);
+            });
+
+            qrActivePeer.on('connection', (conn) => {
+                conn.on('data', (msg) => {
+                    if (msg && msg.type === 'UPAR_DATA_BUNDLE' && msg.payload) {
+                        conn.send({ type: 'UPAR_ACK' });
+                        cleanupQrSyncResources();
+                        overlay.remove();
+                        promptImportModeModal((chosenMode) => {
+                            applyImportedData(msg.payload, chosenMode);
+                        });
+                    }
+                });
+            });
+        } catch (err) {
+            bodyEl.innerHTML = `<p class="text-amber">${isEn ? 'Connection error.' : 'Error al crear el buzón receptor.'}</p>`;
+        }
+    }
+
+    // MODO 3: Abrir cámara en el celular para escanear el QR del PC (envía o recibe automáticamente según el QR)
+    async function startCameraScanMode() {
+        cleanupQrSyncResources();
+        setActiveTabButton(btnTabScan);
+
+        bodyEl.innerHTML = `
+            <div style="position:relative; width:100%; max-width:260px; aspect-ratio:1/1; background:#0f172a; border-radius:0.85rem; overflow:hidden; border:2px solid var(--border); margin-bottom:0.5rem;">
+                <video id="qrCamVideo" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover;"></video>
+                <canvas id="qrCamCanvas" class="hidden"></canvas>
+                <div style="position:absolute; inset:22px; border:2px dashed #10b981; border-radius:0.65rem; pointer-events:none;"></div>
+            </div>
+            <span id="qrCamStatus" class="text-muted-xs">${isEn ? 'Point camera at the PC QR code...' : 'Apunta la cámara al código QR de la pantalla del PC...'}</span>
+        `;
+
+        const video = bodyEl.querySelector('#qrCamVideo');
+        const canvas = bodyEl.querySelector('#qrCamCanvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const statusEl = bodyEl.querySelector('#qrCamStatus');
+
+        try {
+            await ensureQrLibs(true);
+            qrActiveStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } }
+            });
+            video.srcObject = qrActiveStream;
+
+            const tick = () => {
+                if (!qrActiveStream) return;
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = window.jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' });
+
+                    if (code && code.data) {
+                        handleScannedQrInstruction(code.data, statusEl);
+                        return;
+                    }
+                }
+                qrActiveLoopId = requestAnimationFrame(tick);
+            };
+            qrActiveLoopId = requestAnimationFrame(tick);
+        } catch (err) {
+            statusEl.textContent = isEn ? 'Could not access camera.' : 'No se pudo abrir la cámara en este dispositivo.';
+        }
+    }
+
+    function handleScannedQrInstruction(rawText, statusEl) {
+        try {
+            const parsed = JSON.parse(rawText);
+            if (!parsed || !parsed.peerId) throw new Error('Not a valid sync QR');
+
+            if (qrActiveLoopId) cancelAnimationFrame(qrActiveLoopId);
+            if (qrActiveStream) {
+                qrActiveStream.getTracks().forEach(tr => tr.stop());
+                qrActiveStream = null;
+            }
+
+            if (statusEl) statusEl.textContent = isEn ? 'Linking with PC...' : 'Conectando con el PC...';
+
+            qrActivePeer = new window.Peer();
+            qrActivePeer.on('open', () => {
+                const conn = qrActivePeer.connect(parsed.peerId, { reliable: true });
+
+                conn.on('open', () => {
+                    // Si el PC estaba en modo "Recibir aquí (2)", el celular le envía sus datos al PC
+                    if (parsed.mode === 'UPAR_P2P_RECEIVE') {
+                        if (statusEl) statusEl.textContent = isEn ? 'Sending data to PC...' : 'Enviando exámenes y notas al PC...';
+                        conn.send({ type: 'UPAR_DATA_BUNDLE', payload: getCurrentBundleForSync() });
+                    }
+                });
+
+                conn.on('data', (msg) => {
+                    // Si el PC estaba en modo "Enviar de aquí (1)", el celular recibe los datos del PC
+                    if (msg && msg.type === 'UPAR_DATA_BUNDLE' && msg.payload) {
+                        cleanupQrSyncResources();
+                        overlay.remove();
+                        promptImportModeModal((chosenMode) => {
+                            applyImportedData(msg.payload, chosenMode);
+                        });
+                    } else if (msg && msg.type === 'UPAR_ACK') {
+                        showToast(isEn ? 'Data transferred to PC!' : '¡Datos enviados al PC correctamente!');
+                        cleanupQrSyncResources();
+                        overlay.remove();
+                    }
+                });
+            });
+        } catch (e) {
+            showToast(isEn ? 'Unrecognized QR code' : 'Código QR no reconocido', 'fa-triangle-exclamation');
+        }
+    }
+
+    btnTabSend.onclick = startSendQrMode;
+    btnTabReceive.onclick = startReceiveQrMode;
+    btnTabScan.onclick = startCameraScanMode;
+
+    overlay.querySelector('#btnCloseQrHub').onclick = () => {
+        cleanupQrSyncResources();
+        overlay.remove();
+    };
+
+    // Si se abre en celular, iniciar por defecto en pestaña 3 (Escanear); si es PC, en pestaña 1 (Enviar QR)
+    const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobileDevice) {
+        startCameraScanMode();
+    } else {
+        startSendQrMode();
+    }
+}
+
 /* --------------------------------------------------------------------------
    6. NAVEGACIÓN SPA, TEMA CLARO/OSCURO E IDIOMA
    -------------------------------------------------------------------------- */
@@ -1800,6 +2607,9 @@ function applyTranslations() {
     setText('uiSavedExamsTitle', t('savedExamsTitle'));
     setText('uiBtnExportJson', t('btnExportJson'));
     setText('uiBtnImportJson', t('btnImportJson'));
+    setText('uiBtnQrSync', t('btnQrSync'));
+    // setText('uiBtnQrShare', t('btnQrShare'));
+    // setText('uiBtnQrScan', t('btnQrScan'));
     setText('uiAnswerKeyTitle', t('answerKeyTitle'));
     setText('uiAnswerKeySub', t('answerKeySub'));
 
@@ -1820,6 +2630,8 @@ function applyTranslations() {
     setText('optOrientAuto', t('optOrientAuto'));
     setText('optOrientPortrait', t('optOrientPortrait'));
     setText('optOrientLandscape', t('optOrientLandscape'));
+    setText('optPaperLetter', t('optPaperLetter'));
+    setText('optPaperLegal', t('optPaperLegal'));
     setText('uiBtnDownloadSheetPng', t('btnDownloadSheetPng'));
     setText('uiBtnPrintSheetNow', t('btnPrintSheetNow'));
     setText('uiScannerTitle', t('scannerTitle'));
@@ -1895,6 +2707,7 @@ Object.assign(window, {
     deleteSavedExam,
     exportAllDataJSON,
     handleImportJSON,
+    openQrSyncHubModal,
     renderPrintableSheets,
     downloadSheetAsPNG,
     toggleCameraStream,
