@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UparApp Studio — Suite Interactiva Docente</title>
+    <meta name="description" content="UparApp Studio: Suite educativa interactiva con trivias por niveles (UparTrivia), generador de sopas de letras y crucigramas (UparPuzzle), calificador OMR estilo ICFES (UparGrade) y ruletas didácticas (UparWheel).">
     <!-- Configuración PWA para instalar como App en Android, iOS y PC -->
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/svg+xml" href="/icon.svg">
@@ -36,7 +37,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
     <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
 
     <!-- Estilos del Hub Maestro -->
     <link rel="stylesheet" href="styles.css">
@@ -354,11 +356,11 @@
 
     <!-- Pie de Página del Dashboard (Siempre al final real del documento, nunca flotando sobre las cards) -->
     <footer id="suiteMainFooter" class="suite-footer">
-        <p id="uiSuiteFooterText"><strong>UparApp Studio</strong> — Suite Educativa creada por <a href="https://github.com/kevinluisfl" target="_blank">(klfl)</a> • UparSoft 💻</p>
+        <p id="uiSuiteFooterText"><strong>UparApp Studio</strong> — Suite Educativa creada por <a href="https://github.com/kevinluisfl" target="_blank" rel="noopener noreferrer">(klfl)</a> • UparSoft 💻</p>
     </footer>
 
     <!-- Controlador Maestro de la Suite -->
-    <script src="suite.js"></script>
+    <script src="suite.js" defer></script>
 </body>
 
 </html>

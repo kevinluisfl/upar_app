@@ -42,6 +42,28 @@ html.dark {
     --shadow-lg: 0 24px 48px rgba(0, 0, 0, 0.7);
 }
 
+html.dark .text-blue,
+html.dark #uiLaunchPuzzle {
+    color: #38bdf8 !important; /* Contraste > 8:1 sobre #0f172a */
+}
+
+html.dark .tag-blue,
+html.dark #uiTagPuzzle {
+    color: #7dd3fc !important;
+    background-color: rgba(14, 165, 233, 0.18) !important;
+}
+
+html.dark .text-rose,
+html.dark #uiLaunchGrade {
+    color: #fb7185 !important; /* Contraste > 6.2:1 sobre #0f172a */
+}
+
+html.dark .tag-rose,
+html.dark #uiTagGrade {
+    color: #fda4af !important;
+    background-color: rgba(244, 63, 94, 0.2) !important;
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -507,6 +529,7 @@ body {
     transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
     position: relative;
     z-index: 1;
+    min-height: 310px;
 }
 
 .app-card:hover {
