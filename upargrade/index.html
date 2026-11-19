@@ -320,7 +320,7 @@
                             </button>
                             <label class="inline-switch">
                                 <input type="checkbox" id="autoCaptureSheetToggle" checked>
-                                <span>Auto-captura</span>
+                                <span id="uiAutoCaptureLabel">Auto-captura</span>
                             </label>
                         </div>
 
@@ -364,7 +364,7 @@
                         <div id="liveScanStatusPill" class="live-scan-pill hidden">Buscando esquinas de la hoja...</div>
                         <button type="button" id="btnCaptureFloating" class="btn-emerald-md scanner-floating-capture hidden" onclick="captureFromVideoAndScan()">
                             <i class="fa-solid fa-camera-retro"></i>
-                            <span>Capturar y Calificar</span>
+                            <span id="uiBtnCaptureFloating">Capturar</span>
                         </button>
                         <canvas id="omrScannerCanvas" width="700" height="920" class="omr-scanner-canvas"></canvas>
                     </div>
@@ -483,7 +483,7 @@
                 <div class="upar-modal-actions" style="margin-top:0.85rem;">
                     <button type="button" class="btn-danger-sm" onclick="stopCameraStream()">
                         <i class="fa-solid fa-video-slash"></i>
-                        <span>Detener Cámara</span>
+                        <span id="uiBtnModalStopScan">Detener</span>
                     </button>
                 </div>
             </div>

@@ -73,9 +73,14 @@ const I18N = {
         btnPrintSheetNow: 'Generar PDF',
         scannerTitle: 'Escáner Óptico de Hoja ICFES',
         scannerSub: 'Alinea los 4 cuadros negros de las esquinas de la hoja o sube una foto/captura.',
-        btnCameraOn: 'Activar Cámara',
-        btnCameraOff: 'Detener Cámara',
-        btnCapturePhoto: 'Capturar y Calificar',
+        btnCameraOn: 'Escanear',
+        btnCameraOff: 'Detener',
+        btnCapturePhoto: 'Capturar',
+        scannerOrientPortrait: 'Marco: Vertical',
+        scannerOrientLandscape: 'Marco: Horizontal',
+        autoCaptureLabel: 'Auto-captura',
+        modalLiveScannerTitle: 'Escáner en Vivo',
+        btnModalStopScan: 'Detener',
         btnUploadPhoto: 'Subir Foto de Hoja',
         btnSimulateScan: 'Simular Hoja Llena',
         labelSensitivity: 'Sensibilidad de detección de lápiz/tinta:',
@@ -141,7 +146,13 @@ const I18N = {
         modalClearExamDesc: (exam, count) => `Se eliminarán únicamente las <strong>${count} calificaciones</strong> registradas para el examen <strong>"${exam}"</strong> (las notas de los demás exámenes se conservarán).`,
         btnConfirmClearGrades: 'Sí, vaciar registros',
         toastClearedAllGrades: 'Se vació toda la planilla de calificaciones',
-        toastClearedExamGrades: (exam) => `Se vaciaron las calificaciones de "${exam}"`
+        toastClearedExamGrades: (exam) => `Se vaciaron las calificaciones de "${exam}"`,
+        livePointAtCorners: 'Apunta a los 4 cuadros negros...',
+        liveSearchingCorners: 'Buscando las 4 esquinas de la hoja...',
+        liveCornersDetectedPct: (pct) => `4 esquinas detectadas (${pct}%)...`,
+        liveCornersDetectedManual: '4 esquinas detectadas — pulsa Capturar',
+        liveSheetMinimalOk: 'Hoja Simplificada detectada (4 esquinas OK)',
+        liveSheetFullOk: 'Hoja Completa ICFES detectada (4 esquinas OK)'
     },
     en: {
         mainSubtitle: 'OMR answer sheet generator and automated optical grading',
@@ -198,9 +209,14 @@ const I18N = {
         btnPrintSheetNow: 'Generate PDF',
         scannerTitle: 'Optical OMR Sheet Scanner',
         scannerSub: 'Align the 4 black corner squares of the sheet or upload a photo/scan.',
-        btnCameraOn: 'Start Camera',
-        btnCameraOff: 'Stop Camera',
-        btnCapturePhoto: 'Capture & Grade',
+        btnCameraOn: 'To Scan',
+        btnCameraOff: 'Stop Scan',
+        btnCapturePhoto: 'Capture',
+        scannerOrientPortrait: 'Frame: Portrait',
+        scannerOrientLandscape: 'Frame: Landscape',
+        autoCaptureLabel: 'Auto-capture',
+        modalLiveScannerTitle: 'Live Scanner',
+        btnModalStopScan: 'Stop',
         btnUploadPhoto: 'Upload Sheet Photo',
         btnSimulateScan: 'Simulate Filled Sheet',
         labelSensitivity: 'Pencil / Ink detection sensitivity:',
@@ -266,7 +282,13 @@ const I18N = {
         modalClearExamDesc: (exam, count) => `Only the <strong>${count} grades</strong> recorded for <strong>"${exam}"</strong> will be deleted (grades from other exams will be kept).`,
         btnConfirmClearGrades: 'Yes, clear records',
         toastClearedAllGrades: 'Entire gradebook cleared',
-        toastClearedExamGrades: (exam) => `Grades cleared for "${exam}"`
+        toastClearedExamGrades: (exam) => `Grades cleared for "${exam}"`,
+        livePointAtCorners: 'Point at the 4 black squares...',
+        liveSearchingCorners: 'Looking for the 4 sheet corners...',
+        liveCornersDetectedPct: (pct) => `4 corners detected (${pct}%)...`,
+        liveCornersDetectedManual: '4 corners detected — tap Capture',
+        liveSheetMinimalOk: 'Simplified Sheet detected (4 corners OK)',
+        liveSheetFullOk: 'Full ICFES Sheet detected (4 corners OK)',
     }
 };
 
@@ -1787,7 +1809,7 @@ function startLiveFiducialLoop() {
     if (!video || !appState.scanner.stream) return;
     if (pill) {
         pill.classList.remove('hidden');
-        pill.textContent = 'Apunta a los 4 cuadros negros...';
+        pill.textContent = t('livePointAtCorners');
     }
     if (floatBtn) floatBtn.classList.remove('hidden');
 
@@ -1820,9 +1842,10 @@ function startLiveFiducialLoop() {
 
                 guide?.classList.add('is-locked');
                 if (pill) {
+                    const pct = Math.min(100, stableCornersFrames * 35);
                     pill.textContent = autoChk?.checked
-                        ? `4 esquinas detectadas (${Math.min(100, stableCornersFrames * 35)}%)...`
-                        : '4 esquinas detectadas — pulsa Capturar';
+                        ? t('liveCornersDetectedPct')(pct)
+                        : t('liveCornersDetectedManual');
                 }
 
                 if (autoChk?.checked && stableCornersFrames >= 3) {
@@ -1834,7 +1857,7 @@ function startLiveFiducialLoop() {
                 stableCornersFrames = 0;
                 prevCornersCenter = null;
                 guide?.classList.remove('is-locked');
-                if (pill) pill.textContent = 'Buscando las 4 esquinas de la hoja...';
+                if (pill) pill.textContent = t('liveSearchingCorners');
             }
         }
         liveScanRafId = requestAnimationFrame(step);
@@ -1891,7 +1914,7 @@ function toggleScannerViewportOrientation() {
     const lbl = document.getElementById('uiScannerOrientLabel');
     const modalLbl = document.getElementById('uiModalOrientLabel');
     const isLand = scannerViewportOrientation === 'landscape';
-    const text = isLand ? 'Marco: Horizontal' : 'Marco: Vertical';
+    const text = isLand ? t('scannerOrientLandscape') : t('scannerOrientPortrait');
 
     if (wrapper) wrapper.classList.toggle('is-landscape', isLand);
     if (lbl) lbl.textContent = text;
@@ -2360,8 +2383,8 @@ async function processRawPhotoThroughHomography(rawCanvas) {
     const statusBadge = document.getElementById('scanStatusBadge');
     if (statusBadge) {
         statusBadge.textContent = isMinimalDetected
-            ? 'Hoja Simplificada detectada (4 esquinas OK)'
-            : 'Hoja Completa ICFES detectada (4 esquinas OK)';
+            ? t('liveSheetMinimalOk')
+            : t('liveSheetFullOk');
     }
 
     runOMRPixelAnalysis();
@@ -3837,6 +3860,20 @@ function applyTranslations() {
     renderScannedAuditList();
     renderGradebookTable();
     updatePassingLabelsUI(Math.round(getGlobalPassingRatio() * 100));
+
+    setText('uiModalScannerTitle', t('modalLiveScannerTitle'));
+    const modalTitleEl = document.getElementById('cameraModalTitle');
+    if (modalTitleEl && !document.getElementById('uiModalScannerTitle')) {
+        modalTitleEl.innerHTML = `<i class="fa-solid fa-camera text-indigo"></i> ${t('modalLiveScannerTitle')}`;
+    }
+    setText('uiBtnModalStopScan', t('btnModalStopScan'));
+    setText('uiAutoCaptureLabel', t('autoCaptureLabel'));
+    setText('uiBtnCaptureFloating', t('btnCapturePhoto'));
+    const orientText = scannerViewportOrientation === 'landscape'
+        ? t('scannerOrientLandscape')
+        : t('scannerOrientPortrait');
+    setText('uiScannerOrientLabel', orientText);
+    setText('uiModalOrientLabel', orientText);
 }
 
 /* Exposición global explícita */
