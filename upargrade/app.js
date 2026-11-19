@@ -813,17 +813,52 @@ function populateExamFormInputs() {
     updateExamMathSummary();
 }
 
+const SAVED_EXAMS_PAGE_SIZE = 5;
+let savedExamsSearchQuery = '';
+let savedExamsCurrentPage = 1;
+
+function onSavedExamsSearch(val) {
+    savedExamsSearchQuery = String(val || '').trim().toLowerCase();
+    savedExamsCurrentPage = 1;
+    renderSavedExamsList();
+}
+
+function goToSavedExamsPage(pageNum) {
+    const filtered = appState.exams.filter(ex => {
+        if (!savedExamsSearchQuery) return true;
+        return `${ex.title || ''} ${ex.course || ''}`.toLowerCase().includes(savedExamsSearchQuery);
+    });
+    const totalPages = Math.max(1, Math.ceil(filtered.length / SAVED_EXAMS_PAGE_SIZE));
+    savedExamsCurrentPage = Math.max(1, Math.min(totalPages, Number(pageNum) || 1));
+    renderSavedExamsList();
+}
+
 function renderSavedExamsList() {
     const listEl = document.getElementById('savedExamsList');
+    const pagerEl = document.getElementById('savedExamsPagination');
     if (!listEl) return;
+
     document.getElementById('savedExamsBadge').textContent = appState.exams.length;
 
-    if (appState.exams.length === 0) {
+    const filtered = appState.exams.filter(ex => {
+        if (!savedExamsSearchQuery) return true;
+        const hay = `${ex.title || ''} ${ex.course || ''}`.toLowerCase();
+        return hay.includes(savedExamsSearchQuery);
+    });
+
+    if (filtered.length === 0) {
         listEl.innerHTML = `<p class="text-muted-xs" style="text-align:center; padding:0.75rem;">${t('emptySavedExams')}</p>`;
+        if (pagerEl) pagerEl.classList.add('hidden');
         return;
     }
 
-    listEl.innerHTML = appState.exams.map(ex => `
+    const totalPages = Math.ceil(filtered.length / SAVED_EXAMS_PAGE_SIZE);
+    if (savedExamsCurrentPage > totalPages) savedExamsCurrentPage = totalPages;
+
+    const startIdx = (savedExamsCurrentPage - 1) * SAVED_EXAMS_PAGE_SIZE;
+    const pageItems = filtered.slice(startIdx, startIdx + SAVED_EXAMS_PAGE_SIZE);
+
+    listEl.innerHTML = pageItems.map(ex => `
         <div class="saved-exam-item">
             <div style="cursor:pointer; flex:1;" onclick="loadSavedExam('${ex.id}')">
                 <h4>${ex.title}</h4>
@@ -845,6 +880,25 @@ function renderSavedExamsList() {
             </div>
         </div>
     `).join('');
+
+    if (pagerEl) {
+        if (filtered.length > SAVED_EXAMS_PAGE_SIZE) {
+            pagerEl.classList.remove('hidden');
+            pagerEl.innerHTML = `
+                <span>${savedExamsCurrentPage} / ${totalPages} (${filtered.length})</span>
+                <div class="saved-pagination-btns">
+                    <button type="button" class="btn-mini" ${savedExamsCurrentPage <= 1 ? 'disabled' : ''} onclick="goToSavedExamsPage(${savedExamsCurrentPage - 1})">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <button type="button" class="btn-mini" ${savedExamsCurrentPage >= totalPages ? 'disabled' : ''} onclick="goToSavedExamsPage(${savedExamsCurrentPage + 1})">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+            `;
+        } else {
+            pagerEl.classList.add('hidden');
+        }
+    }
 }
 
 /* --------------------------------------------------------------------------
@@ -3820,7 +3874,9 @@ Object.assign(window, {
     clearGradebookForCurrentExam,
     exportGradebookCSV,
     openRosterImporterModal,
-    selectStudentFromRoster
+    selectStudentFromRoster,
+    onSavedExamsSearch,
+    goToSavedExamsPage
 });
 
 window.addEventListener('DOMContentLoaded', () => {
