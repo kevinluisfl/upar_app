@@ -400,6 +400,10 @@
 
                     <!-- Acciones Globales de Respaldo -->
                     <div class="bank-footer-actions">
+                        <button type="button" class="btn-utility" onclick="openTriviaQrSyncModal()" title="Sincronizar con QR (PC ↔ Celular)">
+                            <i class="fa-solid fa-qrcode text-indigo"></i>
+                            <span id="uiBtnTriviaQr">QR Sync</span>
+                        </button>
                         <button class="btn-utility" onclick="exportAllBanksJSON()">
                             <i class="fa-solid fa-file-export text-indigo"></i>
                             <span id="uiBtnExportAll">Exportar Todo (JSON)</span>
@@ -617,6 +621,41 @@
                 <button type="button" class="btn-utility" onclick="closeBankEditorModal()" id="uiBtnCancelBankEdit">Cancelar</button>
                 <button type="button" class="btn-primary-md" onclick="saveEditedBankChanges()">
                     <i class="fa-solid fa-floppy-disk"></i> <span id="uiBtnSaveBankEdit">Guardar cambios</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL DE SINCRONIZACIÓN QR (UPARTRIVIA) ==================== -->
+    <div id="triviaQrModalOverlay" class="modal-overlay">
+        <div class="modal-card trivia-qr-card">
+            <h3 id="uiTriviaQrTitle"><i class="fa-solid fa-qrcode text-indigo"></i> Sincronizar con QR (PC ↔ Celular)</h3>
+            <p id="uiTriviaQrSub" class="modal-body-text" style="margin-bottom:0.8rem; font-size:0.78rem;">
+                Funciona tanto con la cámara normal de tu teléfono como con el escáner interno.
+            </p>
+
+            <div class="trivia-qr-tabs">
+                <button type="button" class="btn-utility trivia-qr-tab" id="tabTriviaQrSend">
+                    <i class="fa-solid fa-upload text-indigo"></i>
+                    <span id="uiTriviaQrTabSend">1. Enviar de aquí (QR)</span>
+                </button>
+                <button type="button" class="btn-utility trivia-qr-tab" id="tabTriviaQrReceive">
+                    <i class="fa-solid fa-download text-emerald"></i>
+                    <span id="uiTriviaQrTabReceive">2. Recibir aquí (QR)</span>
+                </button>
+                <button type="button" class="btn-utility trivia-qr-tab" id="tabTriviaQrScan">
+                    <i class="fa-solid fa-camera text-amber"></i>
+                    <span id="uiTriviaQrTabScan">3. Escanear con Cámara</span>
+                </button>
+            </div>
+
+            <div id="triviaQrHubBody" class="trivia-qr-body">
+                <span class="text-muted-sm">Preparando QR...</span>
+            </div>
+
+            <div class="modal-actions" style="margin-top:0.9rem;">
+                <button type="button" class="btn-utility" id="btnCloseTriviaQrHub">
+                    <span id="uiTriviaQrBtnCancel">Cancelar</span>
                 </button>
             </div>
         </div>

@@ -2753,6 +2753,512 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 /* --------------------------------------------------------------------------
+   10.1 SINCRONIZACIÓN QR BIDIRECCIONAL EN UPARTRIVIA (MISMO FLUJO QUE UPARGRADE)
+   -------------------------------------------------------------------------- */
+let triviaQrStream = null;
+let triviaQrLoopId = null;
+let triviaQrPeer = null;
+
+const TRIVIA_PEER_ICE = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:cloudflare.com:3478' }
+    ]
+};
+
+function loadTriviaScriptOnce(url, globalName) {
+    if (window[globalName]) return Promise.resolve(window[globalName]);
+    return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${url}"]`);
+        if (existing) {
+            existing.addEventListener('load', () => resolve(window[globalName]), { once: true });
+            existing.addEventListener('error', reject, { once: true });
+            return;
+        }
+        const s = document.createElement('script');
+        s.src = url;
+        s.onload = () => resolve(window[globalName]);
+        s.onerror = reject;
+        document.head.appendChild(s);
+    });
+}
+
+function ensureTriviaQrLibs(needPeer = false) {
+    const list = [
+        loadTriviaScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js', 'qrcode'),
+        loadTriviaScriptOnce('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js', 'jsQR')
+    ];
+    if (needPeer) {
+        list.push(loadTriviaScriptOnce('https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'Peer'));
+    }
+    return Promise.all(list);
+}
+
+function cleanupTriviaQrResources() {
+    if (triviaQrLoopId) {
+        cancelAnimationFrame(triviaQrLoopId);
+        triviaQrLoopId = null;
+    }
+    if (triviaQrStream) {
+        triviaQrStream.getTracks().forEach(tr => tr.stop());
+        triviaQrStream = null;
+    }
+    if (triviaQrPeer) {
+        try { triviaQrPeer.destroy(); } catch (_) {}
+        triviaQrPeer = null;
+    }
+}
+
+function getTriviaBundleForSync() {
+    return {
+        app: 'UparTrivia Studio',
+        exportedAt: new Date().toISOString(),
+        teachers: appState.teachers,
+        activeTeacher: appState.activeTeacher,
+        banks: appState.banks,
+        ranking: appState.ranking
+    };
+}
+
+function applyTriviaQrBundle(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+
+    if (Array.isArray(payload.teachers) && payload.teachers.length > 0) {
+        payload.teachers.forEach(tc => {
+            if (!appState.teachers.includes(tc)) appState.teachers.push(tc);
+        });
+        saveTeachersToStorage();
+    }
+
+    if (Array.isArray(payload.banks) && payload.banks.length > 0) {
+        payload.banks.forEach(incBank => {
+            if (!incBank || !Array.isArray(incBank.questions)) return;
+            const idx = appState.banks.findIndex(b => b.id === incBank.id);
+            if (idx >= 0) {
+                appState.banks[idx] = incBank;
+            } else {
+                appState.banks.unshift({
+                    ...incBank,
+                    id: incBank.id || ('bank_' + Date.now() + '_' + Math.floor(Math.random() * 1000))
+                });
+            }
+        });
+        saveBanksToStorage();
+    }
+
+    if (Array.isArray(payload.ranking) && payload.ranking.length > 0) {
+        payload.ranking.forEach(incRow => {
+            if (!incRow) return;
+            const exists = appState.ranking.some(r =>
+                r.player === incRow.player &&
+                r.topic === incRow.topic &&
+                r.score === incRow.score &&
+                r.date === incRow.date
+            );
+            if (!exists) appState.ranking.push(incRow);
+        });
+        saveRankingToStorage();
+    }
+
+    updateLobbySelectors();
+    renderBanksList();
+    renderRankingTable();
+    showToast(appState.lang === 'en' ? 'Trivia data synced via QR!' : '¡Datos de trivia sincronizados por QR!');
+    return true;
+}
+
+function buildCompactTriviaQrParam() {
+    const compactBanks = (appState.banks || []).slice(0, 3).map(b => [
+        b.id,
+        b.title,
+        b.teacher,
+        (b.questions || []).slice(0, 15).map(q => [
+            q.question,
+            q.correct,
+            (q.wrong && q.wrong[0]) || '',
+            (q.wrong && q.wrong[1]) || '',
+            (q.wrong && q.wrong[2]) || '',
+            q.level || 1
+        ])
+    ]);
+    const jsonStr = JSON.stringify({ v: 1, b: compactBanks });
+    return btoa(unescape(encodeURIComponent(jsonStr)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
+
+function decodeCompactTriviaQrParam(b64Param) {
+    let b64 = b64Param.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const parsed = JSON.parse(decodeURIComponent(escape(atob(b64))));
+    if (parsed && parsed.v === 1 && Array.isArray(parsed.b)) {
+        const banks = parsed.b.map((arr, bIdx) => {
+            const [id, title, teacher, qs] = arr;
+            const questions = (qs || []).map((qArr, qIdx) => {
+                const [question, correct, w0, w1, w2, level] = qArr;
+                return {
+                    id: `q_qr_${bIdx}_${qIdx}_${Date.now()}`,
+                    question: question || '',
+                    correct: correct || '',
+                    wrong: [w0 || 'Opción B', w1 || 'Opción C', w2 || 'Opción D'],
+                    level: Number(level) || 1,
+                    url: ''
+                };
+            }).filter(q => q.question && q.correct);
+            return {
+                id: id || ('bank_qr_' + Date.now() + '_' + bIdx),
+                title: title || 'Banco QR',
+                teacher: teacher || appState.activeTeacher,
+                createdAt: new Date().toISOString().slice(0, 10),
+                questions
+            };
+        }).filter(b => b.questions.length > 0);
+        return { banks };
+    }
+    return null;
+}
+
+function buildTriviaSyncUrl(paramsObj) {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const usp = new URLSearchParams(paramsObj);
+    return `${baseUrl}?${usp.toString()}`;
+}
+
+function drawTriviaQrCanvas(containerEl, textData) {
+    const qr = window.qrcode(0, 'L');
+    qr.addData(textData);
+    qr.make();
+
+    const moduleCount = qr.getModuleCount();
+    const cellSize = Math.max(3, Math.min(7, Math.floor(240 / moduleCount)));
+    const margin = cellSize * 2;
+    const size = moduleCount * cellSize + margin * 2;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#0f172a';
+
+    for (let r = 0; r < moduleCount; r++) {
+        for (let c = 0; c < moduleCount; c++) {
+            if (qr.isDark(r, c)) {
+                ctx.fillRect(margin + c * cellSize, margin + r * cellSize, cellSize, cellSize);
+            }
+        }
+    }
+    containerEl.innerHTML = '';
+    containerEl.appendChild(canvas);
+}
+
+function connectTriviaPeer(peerId, mode, statusEl, onDoneFn) {
+    const isEn = appState.lang === 'en';
+    if (statusEl) {
+        statusEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-indigo"></i> ${isEn ? 'Linking devices...' : 'Enlazando dispositivos...'}`;
+    }
+
+    cleanupTriviaQrResources();
+    triviaQrPeer = new window.Peer({ config: TRIVIA_PEER_ICE });
+
+    let done = false;
+    const timer = setTimeout(() => {
+        if (!done && statusEl) {
+            statusEl.textContent = isEn ? 'Connection timed out. Scan again.' : 'Tiempo agotado. Verifica que el otro QR siga abierto e intenta de nuevo.';
+        }
+    }, 14000);
+
+    triviaQrPeer.on('open', () => {
+        const conn = triviaQrPeer.connect(peerId, {
+            reliable: true,
+            serialization: 'json'
+        });
+
+        conn.on('open', () => {
+            if (mode === 'TRIVIA_P2P_RECEIVE') {
+                if (statusEl) statusEl.textContent = isEn ? 'Sending trivia banks...' : 'Enviando bancos y ranking...';
+                conn.send({ type: 'TRIVIA_DATA_BUNDLE', payload: getTriviaBundleForSync() });
+            } else {
+                if (statusEl) statusEl.textContent = isEn ? 'Requesting trivia banks...' : 'Solicitando bancos y ranking...';
+                conn.send({ type: 'TRIVIA_REQUEST_BUNDLE' });
+            }
+        });
+
+        conn.on('data', (msg) => {
+            if (msg && msg.type === 'TRIVIA_DATA_BUNDLE' && msg.payload) {
+                done = true;
+                clearTimeout(timer);
+                cleanupTriviaQrResources();
+                if (onDoneFn) onDoneFn();
+                applyTriviaQrBundle(msg.payload);
+            } else if (msg && msg.type === 'TRIVIA_ACK') {
+                done = true;
+                clearTimeout(timer);
+                showToast(isEn ? 'Trivia data sent successfully!' : '¡Datos de trivia enviados correctamente!');
+                cleanupTriviaQrResources();
+                if (onDoneFn) onDoneFn();
+            }
+        });
+
+        conn.on('error', () => {
+            clearTimeout(timer);
+            if (statusEl) statusEl.textContent = isEn ? 'Transfer error.' : 'Error en la transferencia.';
+        });
+    });
+}
+
+function processTriviaScannedQr(rawText, statusEl, closeModalFn) {
+    const isEn = appState.lang === 'en';
+    if (!rawText) return false;
+    const trimmed = rawText.trim();
+
+    try {
+        if (trimmed.includes('trivia_qrdata=') || trimmed.includes('trivia_qrpeer=')) {
+            const urlObj = new URL(trimmed, window.location.origin);
+            const qrdata = urlObj.searchParams.get('trivia_qrdata');
+            const qrpeer = urlObj.searchParams.get('trivia_qrpeer');
+            const qrmode = urlObj.searchParams.get('trivia_qrmode') || 'TRIVIA_P2P_SEND';
+
+            if (qrdata) {
+                const decoded = decodeCompactTriviaQrParam(qrdata);
+                if (decoded) {
+                    cleanupTriviaQrResources();
+                    if (closeModalFn) closeModalFn();
+                    applyTriviaQrBundle(decoded);
+                    return true;
+                }
+            }
+
+            if (qrpeer) {
+                connectTriviaPeer(qrpeer, qrmode, statusEl, closeModalFn);
+                return true;
+            }
+        }
+    } catch (_) {}
+
+    showToast(isEn ? 'Unrecognized QR code' : 'Código QR no reconocido', 'fa-triangle-exclamation');
+    return false;
+}
+
+async function openTriviaQrSyncModal() {
+    cleanupTriviaQrResources();
+    const isEn = appState.lang === 'en';
+    const overlay = document.getElementById('triviaQrModalOverlay');
+    if (!overlay) return;
+
+    overlay.classList.add('active');
+
+    const bodyEl = document.getElementById('triviaQrHubBody');
+    const btnSend = document.getElementById('tabTriviaQrSend');
+    const btnReceive = document.getElementById('tabTriviaQrReceive');
+    const btnScan = document.getElementById('tabTriviaQrScan');
+    const btnClose = document.getElementById('btnCloseTriviaQrHub');
+
+    const closeModal = () => {
+        cleanupTriviaQrResources();
+        overlay.classList.remove('active');
+    };
+
+    function markTab(activeBtn) {
+        [btnSend, btnReceive, btnScan].forEach(b => {
+            if (!b) return;
+            b.style.borderColor = b === activeBtn ? 'var(--accent-light)' : 'var(--border)';
+            b.style.background = b === activeBtn ? 'var(--accent-soft)' : 'var(--card)';
+        });
+    }
+
+    async function startSendMode() {
+        cleanupTriviaQrResources();
+        markTab(btnSend);
+        bodyEl.innerHTML = `<span class="text-muted-sm">${isEn ? 'Generating QR...' : 'Generando QR...'}</span>`;
+
+        try {
+            await ensureTriviaQrLibs(true);
+            const compactB64 = buildCompactTriviaQrParam();
+            const directUrl = buildTriviaSyncUrl({ trivia_qrdata: compactB64 });
+
+            if (directUrl.length < 1800) {
+                bodyEl.innerHTML = `
+                    <div id="triviaQrRenderBox" class="trivia-qr-box-frame"></div>
+                    <p style="font-size:0.76rem; font-weight:700; color:var(--accent-light); margin-bottom:0.2rem;">
+                        <i class="fa-solid fa-bolt"></i>
+                        ${isEn ? 'Scan with Phone Camera or Tab 3' : 'Escanéalo con la Cámara del celular o desde la Pestaña 3'}
+                    </p>
+                    <span class="text-muted-sm">${isEn ? 'Ready to scan.' : 'Listo para escanear.'}</span>
+                `;
+                drawTriviaQrCanvas(bodyEl.querySelector('#triviaQrRenderBox'), directUrl);
+                return;
+            }
+
+            const roomId = 'upar_trivia_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+            triviaQrPeer = new window.Peer(roomId, { config: TRIVIA_PEER_ICE });
+
+            triviaQrPeer.on('open', (id) => {
+                const p2pUrl = buildTriviaSyncUrl({ trivia_qrpeer: id, trivia_qrmode: 'TRIVIA_P2P_SEND' });
+                bodyEl.innerHTML = `
+                    <div id="triviaQrRenderBox" class="trivia-qr-box-frame"></div>
+                    <p style="font-size:0.76rem; font-weight:700; color:var(--accent-light); margin-bottom:0.2rem;">
+                        <i class="fa-solid fa-mobile-screen-button"></i>
+                        ${isEn ? 'Scan with Phone Camera or Tab 3' : 'Escanéalo con la Cámara de tu Celular o desde la Pestaña 3'}
+                    </p>
+                    <span id="triviaQrLiveStatus" class="text-muted-sm">${isEn ? 'Waiting for phone...' : 'Esperando conexión del otro dispositivo...'}</span>
+                `;
+                drawTriviaQrCanvas(bodyEl.querySelector('#triviaQrRenderBox'), p2pUrl);
+            });
+
+            triviaQrPeer.on('connection', (conn) => {
+                const stEl = bodyEl.querySelector('#triviaQrLiveStatus');
+                if (stEl) stEl.textContent = isEn ? 'Connected! Sending trivia data...' : '¡Conectado! Enviando bancos y ranking...';
+                const sendNow = () => {
+                    conn.send({ type: 'TRIVIA_DATA_BUNDLE', payload: getTriviaBundleForSync() });
+                    setTimeout(() => {
+                        showToast(isEn ? 'Trivia data sent!' : '¡Datos de trivia enviados correctamente!');
+                        closeModal();
+                    }, 700);
+                };
+                conn.on('open', sendNow);
+                conn.on('data', (msg) => {
+                    if (msg && msg.type === 'TRIVIA_REQUEST_BUNDLE') sendNow();
+                });
+            });
+        } catch (_) {
+            bodyEl.innerHTML = `<p class="text-muted-sm">${isEn ? 'Could not generate QR.' : 'No se pudo generar el QR.'}</p>`;
+        }
+    }
+
+    async function startReceiveMode() {
+        cleanupTriviaQrResources();
+        markTab(btnReceive);
+        bodyEl.innerHTML = `<span class="text-muted-sm">${isEn ? 'Preparing receiver QR...' : 'Generando QR para recibir aquí...'}</span>`;
+
+        try {
+            await ensureTriviaQrLibs(true);
+            const roomId = 'upar_trivia_rx_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+            triviaQrPeer = new window.Peer(roomId, { config: TRIVIA_PEER_ICE });
+
+            triviaQrPeer.on('open', (id) => {
+                const rxUrl = buildTriviaSyncUrl({ trivia_qrpeer: id, trivia_qrmode: 'TRIVIA_P2P_RECEIVE' });
+                bodyEl.innerHTML = `
+                    <div id="triviaQrRenderBox" class="trivia-qr-box-frame"></div>
+                    <p style="font-size:0.76rem; font-weight:700; color:var(--emerald); margin-bottom:0.2rem;">
+                        <i class="fa-solid fa-laptop"></i>
+                        ${isEn ? 'Scan this QR from the other device to receive here' : 'Escanea este QR desde el otro dispositivo para recibir aquí'}
+                    </p>
+                    <span id="triviaQrRxStatus" class="text-muted-sm">${isEn ? 'Waiting to receive...' : 'Esperando que el otro dispositivo envíe los datos...'}</span>
+                `;
+                drawTriviaQrCanvas(bodyEl.querySelector('#triviaQrRenderBox'), rxUrl);
+            });
+
+            triviaQrPeer.on('connection', (conn) => {
+                const stEl = bodyEl.querySelector('#triviaQrRxStatus');
+                if (stEl) stEl.textContent = isEn ? 'Receiving trivia data...' : 'Recibiendo datos de trivia...';
+                conn.on('data', (msg) => {
+                    if (msg && msg.type === 'TRIVIA_DATA_BUNDLE' && msg.payload) {
+                        conn.send({ type: 'TRIVIA_ACK' });
+                        closeModal();
+                        applyTriviaQrBundle(msg.payload);
+                    }
+                });
+            });
+        } catch (_) {
+            bodyEl.innerHTML = `<p class="text-muted-sm">${isEn ? 'Could not create receiver QR.' : 'No se pudo crear el QR receptor.'}</p>`;
+        }
+    }
+
+    async function startScanMode() {
+        cleanupTriviaQrResources();
+        markTab(btnScan);
+
+        bodyEl.innerHTML = `
+            <div id="triviaQrCamBox" class="trivia-qr-cam-box">
+                <video id="triviaQrCamVideo" autoplay playsinline muted></video>
+                <canvas id="triviaQrCamCanvas" class="hidden"></canvas>
+                <div class="trivia-qr-cam-reticle"></div>
+            </div>
+            <div id="triviaQrCamStatus" style="font-size:0.78rem; font-weight:700; color:var(--text-secondary);">
+                ${isEn ? 'Point camera at QR code...' : 'Apunta la cámara al código QR...'}
+            </div>
+        `;
+
+        const video = bodyEl.querySelector('#triviaQrCamVideo');
+        const canvas = bodyEl.querySelector('#triviaQrCamCanvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const statusEl = bodyEl.querySelector('#triviaQrCamStatus');
+
+        try {
+            await ensureTriviaQrLibs(true);
+            triviaQrStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } }
+            });
+            video.srcObject = triviaQrStream;
+
+            const tick = () => {
+                if (!triviaQrStream) return;
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = window.jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' });
+
+                    if (code && code.data) {
+                        if (triviaQrLoopId) cancelAnimationFrame(triviaQrLoopId);
+                        if (triviaQrStream) {
+                            triviaQrStream.getTracks().forEach(tr => tr.stop());
+                            triviaQrStream = null;
+                        }
+                        const camBox = bodyEl.querySelector('#triviaQrCamBox');
+                        if (camBox) {
+                            camBox.innerHTML = `<div style="text-align:center; padding:1rem; color:#10b981;"><i class="fa-solid fa-circle-nodes fa-spin" style="font-size:2.4rem; margin-bottom:0.4rem;"></i><p style="font-size:0.76rem; color:#fff;">QR Detectado</p></div>`;
+                        }
+                        processTriviaScannedQr(code.data, statusEl, closeModal);
+                        return;
+                    }
+                }
+                triviaQrLoopId = requestAnimationFrame(tick);
+            };
+            triviaQrLoopId = requestAnimationFrame(tick);
+        } catch (_) {
+            if (statusEl) statusEl.textContent = isEn ? 'Could not access camera.' : 'No se pudo acceder a la cámara.';
+        }
+    }
+
+    if (btnSend) btnSend.onclick = startSendMode;
+    if (btnReceive) btnReceive.onclick = startReceiveMode;
+    if (btnScan) btnScan.onclick = startScanMode;
+    if (btnClose) btnClose.onclick = closeModal;
+
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+        startScanMode();
+    } else {
+        startSendMode();
+    }
+}
+
+async function checkIncomingTriviaQrParams() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('trivia_qrdata') && !params.has('trivia_qrpeer')) return;
+
+    const fullHref = window.location.href;
+    params.delete('trivia_qrdata');
+    params.delete('trivia_qrpeer');
+    params.delete('trivia_qrmode');
+    const cleanSearch = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (cleanSearch ? `?${cleanSearch}` : ''));
+
+    await ensureTriviaQrLibs(true);
+    setTimeout(() => {
+        processTriviaScannedQr(fullHref, null, null);
+    }, 300);
+}
+
+/* --------------------------------------------------------------------------
    11. EXPOSICIÓN EXPLÍCITA AL ÁMBITO GLOBAL (WINDOW) Y ARRANQUE
    -------------------------------------------------------------------------- */
 Object.assign(window, {
@@ -2798,7 +3304,8 @@ Object.assign(window, {
     removeDraftQuestion,
     saveEditedBankChanges,
     onBanksSearchInput,
-    goToBanksPage
+    goToBanksPage,
+    openTriviaQrSyncModal
 });
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -2807,6 +3314,7 @@ window.addEventListener('DOMContentLoaded', () => {
     applyTranslations();
     updateLobbySelectors();
     handleBulkModeChange();
+    checkIncomingTriviaQrParams();
 
     document.getElementById('btnThemeToggle').addEventListener('click', () => {
         appState.theme = appState.theme === 'dark' ? 'light' : 'dark';
