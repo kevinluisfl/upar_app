@@ -1074,6 +1074,37 @@ input:focus, select:focus {
 .audit-item.is-wrong { border-left: 4px solid var(--danger); }
 .audit-item.is-blank { border-left: 4px solid var(--amber); }
 
+.camera-modal-card {
+    max-width: 520px;
+    width: 96%;
+    padding: 1rem;
+    text-align: left;
+}
+
+.camera-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.65rem;
+}
+
+.camera-modal-head h3 {
+    margin: 0;
+    font-size: 0.98rem;
+}
+
+.camera-modal-host {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.camera-modal-host .scanner-viewport-wrapper {
+    width: 100%;
+    max-height: 62vh;
+}
+
 /* ==========================================================================
    7. PLANILLA DE CALIFICACIONES, MODAL DE IMPORTACIÓN Y TOASTS
    ========================================================================== */

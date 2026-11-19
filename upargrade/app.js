@@ -1789,6 +1789,61 @@ function startLiveFiducialLoop() {
     liveScanRafId = requestAnimationFrame(step);
 }
 
+let scannerViewportOrientation = 'portrait';
+
+let scannerHomeParent = null;
+let scannerHomeNextSibling = null;
+let openedCameraInModal = false;
+
+function shouldOpenCameraInModal() {
+    const isSmallViewport = window.innerWidth <= 760 || window.innerHeight < 640;
+    const isInsideSuiteIframe = window.self !== window.top;
+    return isSmallViewport || (isInsideSuiteIframe && window.innerHeight < 780);
+}
+
+function mountScannerViewportMode(useModal) {
+    const wrapper = document.querySelector('#viewScanner .scanner-viewport-wrapper') ||
+                    document.querySelector('#cameraModalHost .scanner-viewport-wrapper');
+    const modalOverlay = document.getElementById('cameraModalOverlay');
+    const modalHost = document.getElementById('cameraModalHost');
+    if (!wrapper) return;
+
+    if (!scannerHomeParent) {
+        scannerHomeParent = wrapper.parentElement;
+        scannerHomeNextSibling = wrapper.nextElementSibling;
+    }
+
+    openedCameraInModal = Boolean(useModal && modalOverlay && modalHost);
+
+    if (openedCameraInModal) {
+        modalHost.appendChild(wrapper);
+        modalOverlay.classList.remove('hidden');
+    } else {
+        if (modalOverlay) modalOverlay.classList.add('hidden');
+        if (scannerHomeParent && wrapper.parentElement !== scannerHomeParent) {
+            if (scannerHomeNextSibling && scannerHomeNextSibling.parentElement === scannerHomeParent) {
+                scannerHomeParent.insertBefore(wrapper, scannerHomeNextSibling);
+            } else {
+                scannerHomeParent.appendChild(wrapper);
+            }
+        }
+        wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+function toggleScannerViewportOrientation() {
+    scannerViewportOrientation = scannerViewportOrientation === 'portrait' ? 'landscape' : 'portrait';
+    const wrapper = document.querySelector('.scanner-viewport-wrapper');
+    const lbl = document.getElementById('uiScannerOrientLabel');
+    const modalLbl = document.getElementById('uiModalOrientLabel');
+    const isLand = scannerViewportOrientation === 'landscape';
+    const text = isLand ? 'Marco: Horizontal' : 'Marco: Vertical';
+
+    if (wrapper) wrapper.classList.toggle('is-landscape', isLand);
+    if (lbl) lbl.textContent = text;
+    if (modalLbl) modalLbl.textContent = text;
+}
+
 async function toggleCameraStream() {
     const video = document.getElementById('scannerVideo');
     const canvas = document.getElementById('omrScannerCanvas');
@@ -1806,6 +1861,7 @@ async function toggleCameraStream() {
             video: { facingMode: 'environment', width: { ideal: 1400 }, height: { ideal: 1800 } }
         });
         appState.scanner.stream = stream;
+        mountScannerViewportMode(shouldOpenCameraInModal());
         video.srcObject = stream;
         video.classList.remove('hidden');
         canvas.classList.add('hidden');
@@ -1814,6 +1870,7 @@ async function toggleCameraStream() {
         btnCam.textContent = t('btnCameraOff');
         startLiveFiducialLoop();
     } catch (err) {
+        mountScannerViewportMode(false);
         showToast('No se pudo acceder a la cámara. Puedes usar "Subir Foto de Hoja".', 'fa-triangle-exclamation');
     }
 }
@@ -1828,20 +1885,16 @@ function stopCameraStream() {
     document.getElementById('omrScannerCanvas')?.classList.remove('hidden');
     document.getElementById('cameraGuideOverlay')?.classList.add('hidden');
     document.getElementById('btnCaptureFrame')?.classList.add('hidden');
+
+    if (openedCameraInModal) {
+        mountScannerViewportMode(false);
+        openedCameraInModal = false;
+    } else {
+        document.getElementById('cameraModalOverlay')?.classList.add('hidden');
+    }
+
     const btnCam = document.getElementById('uiBtnCameraToggle');
     if (btnCam) btnCam.textContent = t('btnCameraOn');
-}
-
-let scannerViewportOrientation = 'portrait';
-
-function toggleScannerViewportOrientation() {
-    scannerViewportOrientation = scannerViewportOrientation === 'portrait' ? 'landscape' : 'portrait';
-    const wrapper = document.querySelector('.scanner-viewport-wrapper');
-    const lbl = document.getElementById('uiScannerOrientLabel');
-    const isLand = scannerViewportOrientation === 'landscape';
-
-    if (wrapper) wrapper.classList.toggle('is-landscape', isLand);
-    if (lbl) lbl.textContent = isLand ? 'Marco: Horizontal' : 'Marco: Vertical';
 }
 
 function captureFromVideoAndScan() {
