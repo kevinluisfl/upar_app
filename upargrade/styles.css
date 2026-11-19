@@ -280,6 +280,7 @@ body {
     flex-direction: column;
     gap: 0.35rem;
     margin-bottom: 0.9rem;
+    min-width: 0;
 }
 
 .form-group label {
@@ -291,17 +292,23 @@ body {
 .input-with-btn {
     display: flex;
     gap: 0.5rem;
+    min-width: 0;
+}
+
+.input-with-btn > input {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .form-row-2 {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
 }
 
 .form-row-3 {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.75rem;
 }
 
@@ -309,6 +316,8 @@ input[type="text"],
 input[type="number"],
 select {
     width: 100%;
+    min-width: 0;
+    max-width: 100%;
     background: var(--card-inner);
     color: var(--text);
     border: 1px solid var(--border);
@@ -475,9 +484,16 @@ input:focus, select:focus {
 
 .saved-footer-btns {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
     padding-top: 0.6rem;
     border-top: 1px solid var(--border);
+}
+
+.saved-footer-btns > .btn-utility {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: center;
 }
 
 /* ==========================================================================
@@ -829,7 +845,9 @@ input:focus, select:focus {
 .scanner-viewport-wrapper {
     position: relative;
     width: 100%;
-    max-width: 520px;
+    max-width: 460px;
+    aspect-ratio: 3 / 4;
+    max-height: 68vh;
     margin: 0 auto;
     background: #0f172a;
     border-radius: 1rem;
@@ -839,8 +857,47 @@ input:focus, select:focus {
 
 .scanner-video {
     width: 100%;
+    height: 100%;
+    object-fit: cover;
     display: block;
 }
+
+/* En upargrade/styles.css, junto a .camera-guide-overlay y .scanner-viewport-wrapper */
+.camera-guide-overlay.is-locked {
+    border-color: #10b981;
+    border-style: solid;
+    box-shadow: inset 0 0 0 2px rgba(16, 185, 129, 0.35);
+}
+
+.camera-guide-overlay.is-locked .guide-corner {
+    border-color: #34d399;
+}
+
+.live-scan-pill {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.82);
+    color: #f8fafc;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.3rem 0.75rem;
+    border-radius: 999px;
+    z-index: 5;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.scanner-floating-capture {
+    position: absolute;
+    bottom: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 6;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+/*  */
 
 .omr-scanner-canvas {
     width: 100%;
@@ -1256,5 +1313,44 @@ input:focus, select:focus {
         justify-content: center;
         border-radius: 0.52rem !important;
         font-size: 0.9rem !important;
+    }
+
+    .studio-card {
+        padding: 1rem;
+    }
+
+    .card-section-header {
+        flex-wrap: wrap;
+    }
+
+    .form-row-2,
+    .form-row-3 {
+        grid-template-columns: 1fr;
+    }
+
+    .points-summary-banner {
+        grid-template-columns: 1fr;
+        text-align: left;
+    }
+
+    .score-hero-card {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .score-stats-grid {
+        width: 100%;
+    }
+
+    .results-actions > select,
+    .results-actions > input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .csv-export-group {
+        width: 100%;
+        flex-wrap: wrap;
     }
 }

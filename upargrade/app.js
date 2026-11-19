@@ -287,8 +287,59 @@ let appState = {
     }
 };
 
+let liveScanRafId = null;
+let lastLiveScanTime = 0;
+let stableCornersFrames = 0;
+let prevCornersCenter = null;
+let isAutoCapturing = false;
+
 function t(key) {
     return I18N[appState.lang]?.[key] ?? I18N.es[key] ?? key;
+}
+
+const ROSTER_STORAGE_KEY = 'upargrade_roster_v1';
+let studentRoster = [];
+
+function loadStudentRoster() {
+    try {
+        const raw = JSON.parse(localStorage.getItem(ROSTER_STORAGE_KEY) || '[]');
+        studentRoster = Array.isArray(raw) ? raw : [];
+    } catch (_) {
+        studentRoster = [];
+    }
+    renderRosterSelectOptions();
+}
+
+function saveStudentRoster(list) {
+    studentRoster = Array.from(new Set(list.map(s => String(s).trim()).filter(Boolean)));
+    localStorage.setItem(ROSTER_STORAGE_KEY, JSON.stringify(studentRoster));
+    renderRosterSelectOptions();
+}
+
+function renderRosterSelectOptions() {
+    const sel = document.getElementById('rosterStudentSelect');
+    if (!sel) return;
+    const current = sel.value;
+    if (studentRoster.length === 0) {
+        sel.innerHTML = `<option value="">-- Seleccionar de la lista base (0 cargados) --</option>`;
+        return;
+    }
+    sel.innerHTML =
+        `<option value="">-- Seleccionar de la lista base (${studentRoster.length} estudiantes) --</option>` +
+        studentRoster.map(name => `<option value="${name.replace(/"/g, '"')}">${name}</option>`).join('');
+    if (current && studentRoster.includes(current)) {
+        sel.value = current;
+    }
+}
+
+function selectStudentFromRoster(selectedName) {
+    if (!selectedName) return;
+    const nameInput = document.getElementById('scannedStudentName');
+    const course = appState.activeExam?.course || '';
+    if (!nameInput) return;
+    nameInput.value = course && !selectedName.toLowerCase().includes(course.toLowerCase())
+        ? `${selectedName} - ${course}`
+        : selectedName;
 }
 
 /* --------------------------------------------------------------------------
@@ -1526,11 +1577,91 @@ function drawReferenceSheetOnScannerCanvas(withSimulatedStudent = false) {
 function generateSimulatedStudentScan() {
     stopCameraStream();
     drawReferenceSheetOnScannerCanvas(true);
-    const names = ['Caroll Cuero', 'Sofía Martínez', 'Luis Fernando Ríos', 'Daniela Gómez', 'Mateo Vargas'];
+    const names = ['Caroll Lopez', 'Sofía Martínez', 'Luis Fernando Ríos', 'Daniela Gómez', 'Mateo Vargas'];
     const randomName = names[Math.floor(Math.random() * names.length)];
     document.getElementById('scannedStudentName').value = `${randomName} - ${appState.activeExam.course}`;
     extractStudentNameStripFromAlignedCanvas();
     showToast(t('toastScanComplete'), 'fa-wand-magic-sparkles');
+}
+
+function stopLiveFiducialLoop() {
+    if (liveScanRafId) {
+        cancelAnimationFrame(liveScanRafId);
+        liveScanRafId = null;
+    }
+    stableCornersFrames = 0;
+    prevCornersCenter = null;
+    isAutoCapturing = false;
+    document.getElementById('liveScanStatusPill')?.classList.add('hidden');
+    document.getElementById('btnCaptureFloating')?.classList.add('hidden');
+    document.getElementById('cameraGuideOverlay')?.classList.remove('is-locked');
+}
+
+function startLiveFiducialLoop() {
+    stopLiveFiducialLoop();
+    const video = document.getElementById('scannerVideo');
+    const guide = document.getElementById('cameraGuideOverlay');
+    const pill = document.getElementById('liveScanStatusPill');
+    const floatBtn = document.getElementById('btnCaptureFloating');
+    const autoChk = document.getElementById('autoCaptureSheetToggle');
+
+    if (!video || !appState.scanner.stream) return;
+    if (pill) {
+        pill.classList.remove('hidden');
+        pill.textContent = 'Apunta a los 4 cuadros negros...';
+    }
+    if (floatBtn) floatBtn.classList.remove('hidden');
+
+    const workCanvas = document.createElement('canvas');
+    const workCtx = workCanvas.getContext('2d', { willReadFrequently: true });
+
+    const step = (now) => {
+        if (!appState.scanner.stream || isAutoCapturing) return;
+        if (now - lastLiveScanTime >= 220 && video.readyState >= video.HAVE_ENOUGH_DATA) {
+            lastLiveScanTime = now;
+            const scale = Math.min(1, 540 / Math.max(video.videoWidth, video.videoHeight));
+            workCanvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+            workCanvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+            workCtx.drawImage(video, 0, 0, workCanvas.width, workCanvas.height);
+
+            const corners = detectFiducialCornersInPhoto(workCanvas);
+            if (corners) {
+                const cx = (corners.tl.x + corners.tr.x + corners.bl.x + corners.br.x) / 4;
+                const cy = (corners.tl.y + corners.tr.y + corners.bl.y + corners.br.y) / 4;
+                const moved = prevCornersCenter
+                    ? Math.hypot(cx - prevCornersCenter.x, cy - prevCornersCenter.y)
+                    : 0;
+                prevCornersCenter = { x: cx, y: cy };
+
+                if (moved < workCanvas.width * 0.04) {
+                    stableCornersFrames++;
+                } else {
+                    stableCornersFrames = 1;
+                }
+
+                guide?.classList.add('is-locked');
+                if (pill) {
+                    pill.textContent = autoChk?.checked
+                        ? `4 esquinas detectadas (${Math.min(100, stableCornersFrames * 35)}%)...`
+                        : '4 esquinas detectadas — pulsa Capturar';
+                }
+
+                if (autoChk?.checked && stableCornersFrames >= 3) {
+                    isAutoCapturing = true;
+                    captureFromVideoAndScan();
+                    return;
+                }
+            } else {
+                stableCornersFrames = 0;
+                prevCornersCenter = null;
+                guide?.classList.remove('is-locked');
+                if (pill) pill.textContent = 'Buscando las 4 esquinas de la hoja...';
+            }
+        }
+        liveScanRafId = requestAnimationFrame(step);
+    };
+
+    liveScanRafId = requestAnimationFrame(step);
 }
 
 async function toggleCameraStream() {
@@ -1556,12 +1687,14 @@ async function toggleCameraStream() {
         guide.classList.remove('hidden');
         btnCap.classList.remove('hidden');
         btnCam.textContent = t('btnCameraOff');
+        startLiveFiducialLoop();
     } catch (err) {
         showToast('No se pudo acceder a la cámara. Puedes usar "Subir Foto de Hoja".', 'fa-triangle-exclamation');
     }
 }
 
 function stopCameraStream() {
+    stopLiveFiducialLoop();
     if (appState.scanner.stream) {
         appState.scanner.stream.getTracks().forEach(tr => tr.stop());
         appState.scanner.stream = null;
@@ -1576,12 +1709,30 @@ function stopCameraStream() {
 
 function captureFromVideoAndScan() {
     const video = document.getElementById('scannerVideo');
-    if (!video || !video.videoWidth) return;
+    if (!video || !video.videoWidth || !video.videoHeight) return;
+
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    // En vertical (retrato), si el sensor entrega más ancho que alto, recortamos al centro con proporción 3:4
+    const targetAspect = 3 / 4;
+    const srcAspect = vw / vh;
+
+    let sx = 0, sy = 0, sw = vw, sh = vh;
+    if (srcAspect > targetAspect) {
+        sw = Math.round(vh * targetAspect);
+        sx = Math.round((vw - sw) / 2);
+    } else if (srcAspect < targetAspect) {
+        sh = Math.round(vw / targetAspect);
+        sy = Math.round((vh - sh) / 2);
+    }
+
+    const outW = Math.min(1200, sw);
+    const outH = Math.round(outW / targetAspect);
 
     const rawCanvas = document.createElement('canvas');
-    rawCanvas.width = video.videoWidth;
-    rawCanvas.height = video.videoHeight;
-    rawCanvas.getContext('2d').drawImage(video, 0, 0);
+    rawCanvas.width = outW;
+    rawCanvas.height = outH;
+    rawCanvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, outW, outH);
 
     stopCameraStream();
     processRawPhotoThroughHomography(rawCanvas);
@@ -2257,6 +2408,126 @@ function saveScannedResultToGradebook() {
     document.getElementById('scannedStudentName').value = '';
     document.getElementById('scannedStudentId').value = '';
     showToast(`${t('toastGradeSaved')}: ${studentName} (${finalGrade.toFixed(2)})`);
+}
+
+function capitalizeWord(str) {
+    return str.toLowerCase().replace(/(?:^|\s|[-'])\S/g, (char) => char.toUpperCase());
+}
+
+function extractNamesFromRawText(rawText, shouldInvert, shouldTitleCase) {
+    const lines = rawText.split('\n');
+    const foundNames = [];
+    const seen = new Set();
+
+    const noiseWords = [
+        'FALTA', 'FALTAS', 'PRESENTE', 'NOTAS', 'ESTUDIANTE',
+        'CALIFICACIONES', 'ASISTENCIA', 'BUENAS TARDES', 'DOCENTE',
+        'GRUPO', 'TECNOLOGÍA'
+    ];
+
+    for (let line of lines) {
+        let clean = line
+            .replace(/["'“”«»]/g, '')
+            .replace(/^[\s\-\*•—\t]+/, '')
+            .trim();
+
+        if (!clean || clean.includes('@') || /^\d+/.test(clean)) continue;
+        if (!clean.includes(',')) continue;
+
+        let upperClean = clean.toUpperCase();
+        if (noiseWords.some((noise) => upperClean.includes(noise))) continue;
+
+        let commaIndex = clean.indexOf(',');
+        let part1 = clean.substring(0, commaIndex).trim();
+        let part2 = clean.substring(commaIndex + 1).trim();
+
+        if (part1.length < 2 || part2.length < 2) continue;
+
+        let lettersOnly = (part1 + part2).replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, '');
+        if (lettersOnly.length < 4) continue;
+
+        let upperCount = 0;
+        for (let ch of lettersOnly) {
+            if (ch === ch.toUpperCase() && ch !== ch.toLowerCase()) upperCount++;
+        }
+
+        if (upperCount / lettersOnly.length >= 0.8) {
+            let finalName = shouldInvert ? `${part2} ${part1}` : `${part1}, ${part2}`;
+            if (shouldTitleCase) {
+                finalName = capitalizeWord(finalName);
+            }
+            if (!seen.has(finalName)) {
+                seen.add(finalName);
+                foundNames.push(finalName);
+            }
+        }
+    }
+
+    return foundNames;
+}
+
+function openRosterImporterModal() {
+    const overlay = document.createElement('div');
+    overlay.className = 'upar-modal-overlay no-print';
+    overlay.innerHTML = `
+        <div class="upar-modal-box" style="max-width:520px; width:95%; text-align:left;">
+            <h3 style="text-align:center;"><i class="fa-solid fa-users text-indigo"></i> Plantilla Base de Estudiantes</h3>
+            <p style="font-size:0.78rem; margin-bottom:0.65rem;">
+                Pega aquí el texto copiado de la plataforma (con comas, notas, faltas o correos). Se limpiará automáticamente y quedará listo para elegir en el escáner.
+            </p>
+            <textarea id="rosterRawTextarea" rows="7" placeholder="APELLIDOS, NOMBRES..." style="width:100%; background:var(--card-inner); color:var(--text); border:1px solid var(--border); border-radius:0.7rem; padding:0.6rem; font-size:0.8rem; margin-bottom:0.65rem;">${studentRoster.join('\n')}</textarea>
+            <label class="inline-switch" style="display:flex; margin-bottom:0.4rem;">
+                <input type="checkbox" id="rosterInvertChk" checked>
+                <span>Invertir a orden natural ("Nombres Apellidos")</span>
+            </label>
+            <label class="inline-switch" style="display:flex; margin-bottom:0.75rem;">
+                <input type="checkbox" id="rosterTitleChk" checked>
+                <span>Convertir a tipo Título</span>
+            </label>
+            <div id="rosterModalMsg" class="text-muted-xs" style="min-height:1.1rem; margin-bottom:0.65rem;"></div>
+            <div class="upar-modal-actions">
+                <button type="button" class="btn-utility" id="btnCancelRosterModal">${t('btnImportCancel')}</button>
+                <button type="button" class="btn-primary-md" id="btnSaveRosterModal">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Limpiar y Guardar Lista
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const ta = overlay.querySelector('#rosterRawTextarea');
+    const msgEl = overlay.querySelector('#rosterModalMsg');
+
+    overlay.querySelector('#btnCancelRosterModal').onclick = () => overlay.remove();
+    overlay.querySelector('#btnSaveRosterModal').onclick = () => {
+        const rawVal = ta.value.trim();
+        if (!rawVal) {
+            saveStudentRoster([]);
+            overlay.remove();
+            showToast('Plantilla base vaciada', 'fa-trash-can');
+            return;
+        }
+
+        const invert = overlay.querySelector('#rosterInvertChk').checked;
+        const titleCase = overlay.querySelector('#rosterTitleChk').checked;
+        const cleaned = extractNamesFromRawText(rawVal, invert, titleCase);
+
+        if (cleaned.length > 0) {
+            saveStudentRoster(cleaned);
+            overlay.remove();
+            showToast(`${cleaned.length} estudiantes limpios guardados en la plantilla base`);
+        } else {
+            // Si el usuario pegó una lista ya limpia por líneas sin comas, la conserva limpia línea a línea
+            const fallbackLines = rawVal.split('\n').map(l => l.trim()).filter(Boolean);
+            if (fallbackLines.length > 0) {
+                saveStudentRoster(fallbackLines);
+                overlay.remove();
+                showToast(`${fallbackLines.length} nombres guardados en la plantilla base`);
+            } else {
+                msgEl.textContent = 'No se detectaron nombres válidos.';
+            }
+        }
+    };
 }
 
 /* --------------------------------------------------------------------------
@@ -3324,11 +3595,14 @@ Object.assign(window, {
     renderGradebookTable,
     deleteSingleResult,
     clearGradebookForCurrentExam,
-    exportGradebookCSV
+    exportGradebookCSV,
+    openRosterImporterModal,
+    selectStudentFromRoster
 });
 
 window.addEventListener('DOMContentLoaded', () => {
     loadStorageData();
+    loadStudentRoster();
     applyTheme();
     populateExamFormInputs();
     renderAnswerKeyGrid();

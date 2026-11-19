@@ -308,6 +308,11 @@
 
                     <!-- Controles de Entrada del Escáner -->
                     <div class="scanner-controls-bar">
+                        <!-- Dentro de .scanner-controls-bar (en upargrade/index.html) -->
+                        <label class="inline-switch" style="margin-left:auto;">
+                            <input type="checkbox" id="autoCaptureSheetToggle" checked>
+                            <span>Auto-captura</span>
+                        </label>
                         <button id="btnStartCamera" class="btn-primary-md" onclick="toggleCameraStream()">
                             <i class="fa-solid fa-video"></i> <span id="uiBtnCameraToggle">Activar Cámara</span>
                         </button>
@@ -345,6 +350,11 @@
                             <div class="guide-corner bl"></div>
                             <div class="guide-corner br"></div>
                         </div>
+                        <div id="liveScanStatusPill" class="live-scan-pill hidden">Buscando esquinas de la hoja...</div>
+                        <button type="button" id="btnCaptureFloating" class="btn-emerald-md scanner-floating-capture hidden" onclick="captureFromVideoAndScan()">
+                            <i class="fa-solid fa-camera-retro"></i>
+                            <span>Capturar y Calificar</span>
+                        </button>
                         <canvas id="omrScannerCanvas" width="700" height="920" class="omr-scanner-canvas"></canvas>
                     </div>
                 </div>
@@ -396,9 +406,24 @@
                         </div>
                         <canvas id="studentNameCropCanvas" width="460" height="58" style="width:100%; height:auto; border-radius:0.45rem; background:#fff; border:1px solid var(--border); display:block;"></canvas>
                     </div>
+                    
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.4rem; flex-wrap:wrap; margin-bottom:0.35rem;">
+                        <span class="text-muted-xs" style="font-weight:700;">
+                            <i class="fa-solid fa-users text-indigo"></i> Plantilla base de estudiantes:
+                        </span>
+                        <button type="button" class="btn-mini" onclick="openRosterImporterModal()">
+                            <i class="fa-solid fa-bolt"></i> Cargar / Limpiar lista
+                        </button>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:0.65rem;">
+                        <select id="rosterStudentSelect" onchange="selectStudentFromRoster(this.value)">
+                            <option value="">-- Seleccionar de la lista base (0 cargados) --</option>
+                        </select>
+                    </div>
+
                     <div class="form-row-2">
                         <div class="form-group">
-                            
                             <label for="scannedStudentName" id="uiLabelStudentName">Nombre del Estudiante</label>
                             <input type="text" id="scannedStudentName" placeholder="Ej. Caroll Lopez - 601">
                         </div>
