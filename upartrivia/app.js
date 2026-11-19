@@ -1836,8 +1836,29 @@ function processBulkImport() {
     showToast(`¡${parsedQuestions.length} ${t('toastBankSavedPre')} "${bankTitle}"!`);
 }
 
+const BANKS_PAGE_SIZE = 5;
+let banksCurrentPage = 1;
+
+function onBanksSearchInput() {
+    banksCurrentPage = 1;
+    renderBanksList();
+}
+
+function goToBanksPage(pageNum) {
+    const query = (document.getElementById('bankSearchInput')?.value || '').trim().toLowerCase();
+    const filteredCount = appState.banks.filter(b =>
+        !query ||
+        b.title.toLowerCase().includes(query) ||
+        b.teacher.toLowerCase().includes(query)
+    ).length;
+    const totalPages = Math.max(1, Math.ceil(filteredCount / BANKS_PAGE_SIZE));
+    banksCurrentPage = Math.max(1, Math.min(totalPages, Number(pageNum) || 1));
+    renderBanksList();
+}
+
 function renderBanksList() {
     const container = document.getElementById('banksListContainer');
+    const pagerEl = document.getElementById('banksPaginationBar');
     if (!container) return;
     const query = (document.getElementById('bankSearchInput')?.value || '').trim().toLowerCase();
     document.getElementById('totalBanksBadge').textContent = `${appState.banks.length} ${t('unitBanks')}`;
@@ -1850,10 +1871,18 @@ function renderBanksList() {
 
     if (filtered.length === 0) {
         container.innerHTML = `<p class="text-muted-sm">${t('emptyBanks')}</p>`;
+        if (pagerEl) pagerEl.classList.add('hidden');
         return;
     }
 
-    container.innerHTML = filtered.map(b => {
+    const totalPages = Math.ceil(filtered.length / BANKS_PAGE_SIZE);
+    if (banksCurrentPage > totalPages) banksCurrentPage = totalPages;
+    if (banksCurrentPage < 1) banksCurrentPage = 1;
+
+    const startIdx = (banksCurrentPage - 1) * BANKS_PAGE_SIZE;
+    const pageItems = filtered.slice(startIdx, startIdx + BANKS_PAGE_SIZE);
+
+    container.innerHTML = pageItems.map(b => {
         const byLvl = [1, 2, 3, 4, 5].map(l => b.questions.filter(q => q.level === l).length);
         return `
             <div class="bank-item-card">
@@ -1875,6 +1904,25 @@ function renderBanksList() {
             </div>
         `;
     }).join('');
+
+    if (pagerEl) {
+        if (filtered.length > BANKS_PAGE_SIZE) {
+            pagerEl.classList.remove('hidden');
+            pagerEl.innerHTML = `
+                <span>${banksCurrentPage} / ${totalPages} (${filtered.length})</span>
+                <div class="banks-pagination-btns">
+                    <button type="button" class="btn-mini" ${banksCurrentPage <= 1 ? 'disabled' : ''} onclick="goToBanksPage(${banksCurrentPage - 1})">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <button type="button" class="btn-mini" ${banksCurrentPage >= totalPages ? 'disabled' : ''} onclick="goToBanksPage(${banksCurrentPage + 1})">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+            `;
+        } else {
+            pagerEl.classList.add('hidden');
+        }
+    }
 }
 
 let editingBankId = null;
@@ -2748,7 +2796,9 @@ Object.assign(window, {
     updateDraftQuestionField,
     updateDraftQuestionWrong,
     removeDraftQuestion,
-    saveEditedBankChanges
+    saveEditedBankChanges,
+    onBanksSearchInput,
+    goToBanksPage
 });
 
 window.addEventListener('DOMContentLoaded', () => {

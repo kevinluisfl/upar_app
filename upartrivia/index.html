@@ -391,11 +391,12 @@
                     <!-- Buscador y Filtro por Docente -->
                     <div class="search-box-wrapper">
                         <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                        <input type="text" id="bankSearchInput" oninput="renderBanksList()" placeholder="Buscar temática o docente...">
+                        <input type="text" id="bankSearchInput" oninput="onBanksSearchInput()" placeholder="Buscar temática o docente...">
                     </div>
 
                     <!-- Lista de Bancos -->
                     <div id="banksListContainer" class="banks-list-container"></div>
+                    <div id="banksPaginationBar" class="banks-pagination-bar hidden"></div>
 
                     <!-- Acciones Globales de Respaldo -->
                     <div class="bank-footer-actions">

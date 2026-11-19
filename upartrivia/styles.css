@@ -969,6 +969,23 @@ textarea:focus {
     padding-right: 0.25rem;
 }
 
+.banks-pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.banks-pagination-btns {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
 .bank-item-card {
     background: var(--card-inner);
     border: 1px solid var(--border);
