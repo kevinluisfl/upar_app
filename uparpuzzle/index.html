@@ -203,8 +203,12 @@
                             </div>
                         </div>
 
-                        <!-- 3 Botones: Exportar, Importar, Vaciar (Adaptados al diseño de Ajustes Generales) -->
+                        <!-- 4 Botones: QR Sync, Exportar, Importar, Vaciar (Adaptados al diseño de Ajustes Generales) -->
                         <div class="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-200/70 dark:border-slate-700/70">
+                            <button type="button" onclick="openPuzzleQrSyncModal()" class="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/30 text-slate-700 dark:text-slate-200 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition" title="Sincronizar con QR (PC ↔ Celular)">
+                                <i class="fa-solid fa-qrcode text-indigo-500"></i>
+                                <span id="uiBtnPuzzleQr" class="truncate">QR Sync</span>
+                            </button>
                             <button type="button" onclick="exportActivitiesJSON()" class="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/30 text-slate-700 dark:text-slate-200 text-[11px] font-semibold flex items-center justify-center gap-1.5 transition" title="Exportar en JSON">
                                 <i class="fa-solid fa-file-export text-indigo-500"></i>
                                 <span id="uiBtnExportJson" class="truncate">Exportar</span>
@@ -503,6 +507,44 @@ COMETA" class="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate
             </section>
         </div>
     </main>
+
+    <!-- Modal de Sincronización QR (PC ↔ Celular) -->
+    <div id="puzzleQrModalOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4 no-print">
+        <div class="puzzle-qr-modal-card bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-lg w-full p-5 text-center border border-slate-100 dark:border-slate-800">
+            <h3 id="uiPuzzleQrTitle" class="text-lg font-extrabold text-slate-900 dark:text-white mb-1 flex items-center justify-center gap-2">
+                <i class="fa-solid fa-qrcode text-indigo-500"></i>
+                <span>Sincronizar con QR (PC ↔ Celular)</span>
+            </h3>
+            <p id="uiPuzzleQrSub" class="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                Funciona tanto con la cámara normal de tu teléfono como con el escáner interno.
+            </p>
+
+            <div class="puzzle-qr-tabs">
+                <button type="button" id="tabPuzzleQrSend" class="puzzle-qr-tab">
+                    <i class="fa-solid fa-upload text-indigo-500"></i>
+                    <span>1. Enviar de aquí (QR)</span>
+                </button>
+                <button type="button" id="tabPuzzleQrReceive" class="puzzle-qr-tab">
+                    <i class="fa-solid fa-download text-emerald-500"></i>
+                    <span>2. Recibir aquí (QR)</span>
+                </button>
+                <button type="button" id="tabPuzzleQrScan" class="puzzle-qr-tab">
+                    <i class="fa-solid fa-camera text-amber-500"></i>
+                    <span>3. Escanear con Cámara</span>
+                </button>
+            </div>
+
+            <div id="puzzleQrHubBody" class="puzzle-qr-body">
+                <span class="text-xs text-slate-400">Preparando QR...</span>
+            </div>
+
+            <div class="mt-4 flex justify-center">
+                <button type="button" id="btnClosePuzzleQrHub" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Pie de Página -->
     <footer id="appMainFooter" class="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-4 no-print transition-colors">

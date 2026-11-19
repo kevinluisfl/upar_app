@@ -2901,12 +2901,506 @@ function exportAsImage() {
 }
 
 /* =========================================================================
+   8.1 SINCRONIZACIÓN QR BIDIRECCIONAL EN UPARPUZZLE (MISMO FLUJO QUE UPARGRADE)
+   ========================================================================= */
+let puzzleQrStream = null;
+let puzzleQrLoopId = null;
+let puzzleQrPeer = null;
+
+const PUZZLE_PEER_ICE = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:cloudflare.com:3478' }
+    ]
+};
+
+function loadPuzzleScriptOnce(url, globalName) {
+    if (window[globalName]) return Promise.resolve(window[globalName]);
+    return new Promise((resolve, reject) => {
+        const existing = document.querySelector(`script[src="${url}"]`);
+        if (existing) {
+            existing.addEventListener('load', () => resolve(window[globalName]), { once: true });
+            existing.addEventListener('error', reject, { once: true });
+            return;
+        }
+        const s = document.createElement('script');
+        s.src = url;
+        s.onload = () => resolve(window[globalName]);
+        s.onerror = reject;
+        document.head.appendChild(s);
+    });
+}
+
+function ensurePuzzleQrLibs(needPeer = false) {
+    const list = [
+        loadPuzzleScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js', 'qrcode'),
+        loadPuzzleScriptOnce('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js', 'jsQR')
+    ];
+    if (needPeer) {
+        list.push(loadPuzzleScriptOnce('https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'Peer'));
+    }
+    return Promise.all(list);
+}
+
+function cleanupPuzzleQrResources() {
+    if (puzzleQrLoopId) {
+        cancelAnimationFrame(puzzleQrLoopId);
+        puzzleQrLoopId = null;
+    }
+    if (puzzleQrStream) {
+        puzzleQrStream.getTracks().forEach(tr => tr.stop());
+        puzzleQrStream = null;
+    }
+    if (puzzleQrPeer) {
+        try { puzzleQrPeer.destroy(); } catch (_) {}
+        puzzleQrPeer = null;
+    }
+}
+
+function getPuzzleBundleForSync() {
+    return {
+        app: 'UparPuzzle Studio',
+        exportedAt: new Date().toISOString(),
+        currentActivity: {
+            id: 'act_qr_' + Date.now(),
+            name: document.getElementById('puzzleTitleInput')?.value.trim() || appState.title,
+            title: appState.title,
+            createdAt: new Date().toISOString(),
+            mode: appState.mode,
+            items: appState.items,
+            settings: {
+                wsGridSize: document.getElementById('wsGridSize')?.value || '12',
+                dirHorizontal: Boolean(document.getElementById('dirHorizontal')?.checked),
+                dirVertical: Boolean(document.getElementById('dirVertical')?.checked),
+                dirDiagonal: Boolean(document.getElementById('dirDiagonal')?.checked),
+                dirReverse: Boolean(document.getElementById('dirReverse')?.checked)
+            }
+        },
+        savedActivities: getSavedActivities()
+    };
+}
+
+function applyPuzzleQrBundle(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    let existing = getSavedActivities();
+    let targetAct = null;
+
+    if (Array.isArray(payload.savedActivities)) {
+        payload.savedActivities.forEach(act => {
+            if (!act || !act.name || !Array.isArray(act.items)) return;
+            existing = existing.filter(x => x.name.toLowerCase() !== act.name.toLowerCase());
+            existing.unshift(act);
+            if (!targetAct) targetAct = act;
+        });
+    }
+
+    if (payload.currentActivity && Array.isArray(payload.currentActivity.items)) {
+        const curr = payload.currentActivity;
+        existing = existing.filter(x => x.name.toLowerCase() !== (curr.name || '').toLowerCase());
+        existing.unshift(curr);
+        targetAct = curr;
+    }
+
+    setSavedActivities(existing);
+    if (targetAct) {
+        loadSavedActivity(targetAct.id);
+    }
+    showToast(t('toastImportSuccess'), 'success');
+    return true;
+}
+
+function buildCompactPuzzleQrParam() {
+    const compactItems = (appState.items || []).slice(0, 14).map(it => [
+        it.word,
+        String(it.clue || '').slice(0, 60)
+    ]);
+    const jsonStr = JSON.stringify({
+        v: 1,
+        t: String(appState.title || t('untitledPuzzle')).slice(0, 45),
+        m: appState.mode || 'wordsearch',
+        w: compactItems
+    });
+    return btoa(unescape(encodeURIComponent(jsonStr)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
+
+function decodeCompactPuzzleQrParam(b64Param) {
+    let b64 = b64Param.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const parsed = JSON.parse(decodeURIComponent(escape(atob(b64))));
+    if (parsed && parsed.v === 1 && Array.isArray(parsed.w)) {
+        const items = parsed.w.map((arr, idx) => ({
+            id: 'item_qr_' + Date.now() + '_' + idx,
+            word: sanitizeWord(arr[0] || ''),
+            clue: arr[1] || `${t('defaultCluePrefix')} ${sanitizeWord(arr[0] || '')}`
+        })).filter(it => it.word.length >= 2);
+
+        return {
+            currentActivity: {
+                id: 'act_qr_' + Date.now(),
+                name: parsed.t || t('untitledPuzzle'),
+                title: parsed.t || t('untitledPuzzle'),
+                createdAt: new Date().toISOString(),
+                mode: parsed.m === 'crossword' ? 'crossword' : 'wordsearch',
+                items
+            },
+            savedActivities: []
+        };
+    }
+    return null;
+}
+
+function buildPuzzleSyncUrl(paramsObj) {
+    const baseUrl = window.location.origin + window.location.pathname;
+    const usp = new URLSearchParams(paramsObj);
+    return `${baseUrl}?${usp.toString()}`;
+}
+
+function drawPuzzleQrCanvas(containerEl, textData) {
+    const qr = window.qrcode(0, 'L');
+    qr.addData(textData);
+    qr.make();
+
+    const moduleCount = qr.getModuleCount();
+    const cellSize = Math.max(3, Math.min(7, Math.floor(240 / moduleCount)));
+    const margin = cellSize * 2;
+    const size = moduleCount * cellSize + margin * 2;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = '#0f172a';
+
+    for (let r = 0; r < moduleCount; r++) {
+        for (let c = 0; c < moduleCount; c++) {
+            if (qr.isDark(r, c)) {
+                ctx.fillRect(margin + c * cellSize, margin + r * cellSize, cellSize, cellSize);
+            }
+        }
+    }
+    containerEl.innerHTML = '';
+    containerEl.appendChild(canvas);
+}
+
+function connectPuzzlePeer(peerId, mode, statusEl, onDoneFn) {
+    const isEn = currentLang === 'en';
+    if (statusEl) {
+        statusEl.textContent = isEn ? 'Linking devices...' : 'Enlazando dispositivos...';
+    }
+
+    cleanupPuzzleQrResources();
+    puzzleQrPeer = new window.Peer({ config: PUZZLE_PEER_ICE });
+
+    let done = false;
+    const timer = setTimeout(() => {
+        if (!done && statusEl) {
+            statusEl.textContent = isEn ? 'Connection timed out. Scan again.' : 'Tiempo agotado. Verifica que el otro QR siga abierto e intenta de nuevo.';
+        }
+    }, 14000);
+
+    puzzleQrPeer.on('open', () => {
+        const conn = puzzleQrPeer.connect(peerId, {
+            reliable: true,
+            serialization: 'json'
+        });
+
+        conn.on('open', () => {
+            if (mode === 'PUZZLE_P2P_RECEIVE') {
+                if (statusEl) statusEl.textContent = isEn ? 'Sending activities...' : 'Enviando actividades...';
+                conn.send({ type: 'PUZZLE_DATA_BUNDLE', payload: getPuzzleBundleForSync() });
+            } else {
+                if (statusEl) statusEl.textContent = isEn ? 'Requesting activities...' : 'Solicitando actividades...';
+                conn.send({ type: 'PUZZLE_REQUEST_BUNDLE' });
+            }
+        });
+
+        conn.on('data', (msg) => {
+            if (msg && msg.type === 'PUZZLE_DATA_BUNDLE' && msg.payload) {
+                done = true;
+                clearTimeout(timer);
+                cleanupPuzzleQrResources();
+                if (onDoneFn) onDoneFn();
+                applyPuzzleQrBundle(msg.payload);
+            } else if (msg && msg.type === 'PUZZLE_ACK') {
+                done = true;
+                clearTimeout(timer);
+                showToast(isEn ? 'Activities sent successfully!' : '¡Actividades enviadas correctamente!', 'success');
+                cleanupPuzzleQrResources();
+                if (onDoneFn) onDoneFn();
+            }
+        });
+
+        conn.on('error', () => {
+            clearTimeout(timer);
+            if (statusEl) statusEl.textContent = isEn ? 'Transfer error.' : 'Error en la transferencia.';
+        });
+    });
+}
+
+function processPuzzleScannedQr(rawText, statusEl, closeModalFn) {
+    if (!rawText) return false;
+    const trimmed = rawText.trim();
+
+    try {
+        if (trimmed.includes('puzzle_qrdata=') || trimmed.includes('puzzle_qrpeer=')) {
+            const urlObj = new URL(trimmed, window.location.origin);
+            const qrdata = urlObj.searchParams.get('puzzle_qrdata');
+            const qrpeer = urlObj.searchParams.get('puzzle_qrpeer');
+            const qrmode = urlObj.searchParams.get('puzzle_qrmode') || 'PUZZLE_P2P_SEND';
+
+            if (qrdata) {
+                const decoded = decodeCompactPuzzleQrParam(qrdata);
+                if (decoded) {
+                    cleanupPuzzleQrResources();
+                    if (closeModalFn) closeModalFn();
+                    applyPuzzleQrBundle(decoded);
+                    return true;
+                }
+            }
+
+            if (qrpeer) {
+                connectPuzzlePeer(qrpeer, qrmode, statusEl, closeModalFn);
+                return true;
+            }
+        }
+    } catch (_) {}
+
+    showToast(t('toastImportError'), 'warning');
+    return false;
+}
+
+async function openPuzzleQrSyncModal() {
+    cleanupPuzzleQrResources();
+    const isEn = currentLang === 'en';
+    const overlay = document.getElementById('puzzleQrModalOverlay');
+    if (!overlay) return;
+
+    overlay.classList.remove('hidden');
+    overlay.classList.add('flex');
+
+    const bodyEl = document.getElementById('puzzleQrHubBody');
+    const btnSend = document.getElementById('tabPuzzleQrSend');
+    const btnReceive = document.getElementById('tabPuzzleQrReceive');
+    const btnScan = document.getElementById('tabPuzzleQrScan');
+    const btnClose = document.getElementById('btnClosePuzzleQrHub');
+
+    const closeModal = () => {
+        cleanupPuzzleQrResources();
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+    };
+
+    function markTab(activeBtn) {
+        [btnSend, btnReceive, btnScan].forEach(b => {
+            if (!b) return;
+            const active = b === activeBtn;
+            b.style.borderColor = active ? '#6366f1' : '';
+            b.style.boxShadow = active ? '0 0 0 2px rgba(99, 102, 241, 0.25)' : '';
+        });
+    }
+
+    async function startSendMode() {
+        cleanupPuzzleQrResources();
+        markTab(btnSend);
+        bodyEl.innerHTML = `<span class="text-xs text-slate-400">${isEn ? 'Generating QR...' : 'Generando QR...'}</span>`;
+
+        try {
+            await ensurePuzzleQrLibs(true);
+            const compactB64 = buildCompactPuzzleQrParam();
+            const directUrl = buildPuzzleSyncUrl({ puzzle_qrdata: compactB64 });
+
+            if (directUrl.length < 1800) {
+                bodyEl.innerHTML = `
+                    <div id="puzzleQrRenderBox" class="puzzle-qr-box-frame"></div>
+                    <p class="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">
+                        <i class="fa-solid fa-bolt"></i>
+                        ${isEn ? 'Scan with Phone Camera or Tab 3' : 'Escanéalo con la Cámara del celular o desde la Pestaña 3'}
+                    </p>
+                    <span class="text-[11px] text-slate-500 dark:text-slate-400">${isEn ? 'Ready to scan.' : 'Listo para escanear.'}</span>
+                `;
+                drawPuzzleQrCanvas(bodyEl.querySelector('#puzzleQrRenderBox'), directUrl);
+                return;
+            }
+
+            const roomId = 'upar_puzzle_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+            puzzleQrPeer = new window.Peer(roomId, { config: PUZZLE_PEER_ICE });
+
+            puzzleQrPeer.on('open', (id) => {
+                const p2pUrl = buildPuzzleSyncUrl({ puzzle_qrpeer: id, puzzle_qrmode: 'PUZZLE_P2P_SEND' });
+                bodyEl.innerHTML = `
+                    <div id="puzzleQrRenderBox" class="puzzle-qr-box-frame"></div>
+                    <p class="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">
+                        <i class="fa-solid fa-mobile-screen-button"></i>
+                        ${isEn ? 'Scan with Phone Camera or Tab 3' : 'Escanéalo con la Cámara de tu Celular o desde la Pestaña 3'}
+                    </p>
+                    <span id="puzzleQrLiveStatus" class="text-[11px] text-slate-500 dark:text-slate-400">${isEn ? 'Waiting for phone...' : 'Esperando conexión del otro dispositivo...'}</span>
+                `;
+                drawPuzzleQrCanvas(bodyEl.querySelector('#puzzleQrRenderBox'), p2pUrl);
+            });
+
+            puzzleQrPeer.on('connection', (conn) => {
+                const stEl = bodyEl.querySelector('#puzzleQrLiveStatus');
+                if (stEl) stEl.textContent = isEn ? 'Connected! Sending activities...' : '¡Conectado! Enviando actividades...';
+                const sendNow = () => {
+                    conn.send({ type: 'PUZZLE_DATA_BUNDLE', payload: getPuzzleBundleForSync() });
+                    setTimeout(() => {
+                        showToast(isEn ? 'Activities sent!' : '¡Actividades enviadas correctamente!', 'success');
+                        closeModal();
+                    }, 700);
+                };
+                conn.on('open', sendNow);
+                conn.on('data', (msg) => {
+                    if (msg && msg.type === 'PUZZLE_REQUEST_BUNDLE') sendNow();
+                });
+            });
+        } catch (_) {
+            bodyEl.innerHTML = `<p class="text-xs text-amber-600">${isEn ? 'Could not generate QR.' : 'No se pudo generar el QR.'}</p>`;
+        }
+    }
+
+    async function startReceiveMode() {
+        cleanupPuzzleQrResources();
+        markTab(btnReceive);
+        bodyEl.innerHTML = `<span class="text-xs text-slate-400">${isEn ? 'Preparing receiver QR...' : 'Generando QR para recibir aquí...'}</span>`;
+
+        try {
+            await ensurePuzzleQrLibs(true);
+            const roomId = 'upar_puzzle_rx_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+            puzzleQrPeer = new window.Peer(roomId, { config: PUZZLE_PEER_ICE });
+
+            puzzleQrPeer.on('open', (id) => {
+                const rxUrl = buildPuzzleSyncUrl({ puzzle_qrpeer: id, puzzle_qrmode: 'PUZZLE_P2P_RECEIVE' });
+                bodyEl.innerHTML = `
+                    <div id="puzzleQrRenderBox" class="puzzle-qr-box-frame"></div>
+                    <p class="text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-1">
+                        <i class="fa-solid fa-laptop"></i>
+                        ${isEn ? 'Scan this QR from the other device to receive here' : 'Escanea este QR desde el otro dispositivo para recibir aquí'}
+                    </p>
+                    <span id="puzzleQrRxStatus" class="text-[11px] text-slate-500 dark:text-slate-400">${isEn ? 'Waiting to receive...' : 'Esperando que el otro dispositivo envíe los datos...'}</span>
+                `;
+                drawPuzzleQrCanvas(bodyEl.querySelector('#puzzleQrRenderBox'), rxUrl);
+            });
+
+            puzzleQrPeer.on('connection', (conn) => {
+                const stEl = bodyEl.querySelector('#puzzleQrRxStatus');
+                if (stEl) stEl.textContent = isEn ? 'Receiving activities...' : 'Recibiendo actividades...';
+                conn.on('data', (msg) => {
+                    if (msg && msg.type === 'PUZZLE_DATA_BUNDLE' && msg.payload) {
+                        conn.send({ type: 'PUZZLE_ACK' });
+                        closeModal();
+                        applyPuzzleQrBundle(msg.payload);
+                    }
+                });
+            });
+        } catch (_) {
+            bodyEl.innerHTML = `<p class="text-xs text-amber-600">${isEn ? 'Could not create receiver QR.' : 'No se pudo crear el QR receptor.'}</p>`;
+        }
+    }
+
+    async function startScanMode() {
+        cleanupPuzzleQrResources();
+        markTab(btnScan);
+
+        bodyEl.innerHTML = `
+            <div id="puzzleQrCamBox" class="puzzle-qr-cam-box">
+                <video id="puzzleQrCamVideo" autoplay playsinline muted></video>
+                <canvas id="puzzleQrCamCanvas" class="hidden"></canvas>
+                <div class="puzzle-qr-cam-reticle"></div>
+            </div>
+            <div id="puzzleQrCamStatus" class="text-xs font-bold text-slate-600 dark:text-slate-300">
+                ${isEn ? 'Point camera at QR code...' : 'Apunta la cámara al código QR...'}
+            </div>
+        `;
+
+        const video = bodyEl.querySelector('#puzzleQrCamVideo');
+        const canvas = bodyEl.querySelector('#puzzleQrCamCanvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const statusEl = bodyEl.querySelector('#puzzleQrCamStatus');
+
+        try {
+            await ensurePuzzleQrLibs(true);
+            puzzleQrStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } }
+            });
+            video.srcObject = puzzleQrStream;
+
+            const tick = () => {
+                if (!puzzleQrStream) return;
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = window.jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'dontInvert' });
+
+                    if (code && code.data) {
+                        if (puzzleQrLoopId) cancelAnimationFrame(puzzleQrLoopId);
+                        if (puzzleQrStream) {
+                            puzzleQrStream.getTracks().forEach(tr => tr.stop());
+                            puzzleQrStream = null;
+                        }
+                        const camBox = bodyEl.querySelector('#puzzleQrCamBox');
+                        if (camBox) {
+                            camBox.innerHTML = `<div style="text-align:center;padding:1rem;color:#10b981;"><i class="fa-solid fa-circle-nodes fa-spin" style="font-size:2.4rem;margin-bottom:0.4rem;"></i><p style="font-size:0.76rem;color:#fff;">QR Detectado</p></div>`;
+                        }
+                        processPuzzleScannedQr(code.data, statusEl, closeModal);
+                        return;
+                    }
+                }
+                puzzleQrLoopId = requestAnimationFrame(tick);
+            };
+            puzzleQrLoopId = requestAnimationFrame(tick);
+        } catch (_) {
+            if (statusEl) statusEl.textContent = isEn ? 'Could not access camera.' : 'No se pudo acceder a la cámara.';
+        }
+    }
+
+    if (btnSend) btnSend.onclick = startSendMode;
+    if (btnReceive) btnReceive.onclick = startReceiveMode;
+    if (btnScan) btnScan.onclick = startScanMode;
+    if (btnClose) btnClose.onclick = closeModal;
+
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) {
+        startScanMode();
+    } else {
+        startSendMode();
+    }
+}
+
+async function checkIncomingPuzzleQrParams() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('puzzle_qrdata') && !params.has('puzzle_qrpeer')) return;
+
+    const fullHref = window.location.href;
+    params.delete('puzzle_qrdata');
+    params.delete('puzzle_qrpeer');
+    params.delete('puzzle_qrmode');
+    const cleanSearch = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (cleanSearch ? `?${cleanSearch}` : ''));
+
+    await ensurePuzzleQrLibs(true);
+    setTimeout(() => {
+        processPuzzleScannedQr(fullHref, null, null);
+    }, 350);
+}
+
+/* =========================================================================
    9. INICIALIZACIÓN AL CARGAR LA PÁGINA
    ========================================================================= */
 window.onload = function () {
     applyTheme();
     initWordSearchTouchEvents();
     initMobileCrosswordKeyboard();
+    checkIncomingPuzzleQrParams();
     setTimeout(() => {
         loadPreset('astronomia');
         applyTranslations();
