@@ -342,6 +342,37 @@ function selectStudentFromRoster(selectedName) {
         : selectedName;
 }
 
+const ROSTER_AUTO_REMOVE_KEY = 'upargrade_roster_auto_remove_v1';
+
+function loadAutoRemoveRosterPref() {
+    const chk = document.getElementById('autoRemoveRosterOnSave');
+    if (!chk) return;
+    const saved = localStorage.getItem(ROSTER_AUTO_REMOVE_KEY);
+    chk.checked = saved === null ? true : saved === 'true';
+}
+
+function toggleAutoRemoveRoster(isChecked) {
+    localStorage.setItem(ROSTER_AUTO_REMOVE_KEY, isChecked ? 'true' : 'false');
+}
+
+function removeMatchedStudentFromRoster(fullStudentNameWithCourse) {
+    const chk = document.getElementById('autoRemoveRosterOnSave');
+    if (!chk || !chk.checked || studentRoster.length === 0) return;
+
+    const cleanInput = String(fullStudentNameWithCourse || '')
+        .split(' - ')[0]
+        .trim()
+        .toLowerCase();
+    if (!cleanInput) return;
+
+    const updated = studentRoster.filter(item => item.trim().toLowerCase() !== cleanInput);
+    if (updated.length !== studentRoster.length) {
+        saveStudentRoster(updated);
+        const sel = document.getElementById('rosterStudentSelect');
+        if (sel) sel.value = '';
+    }
+}
+
 /* --------------------------------------------------------------------------
    2. INICIALIZACIÓN Y GESTIÓN DE EXÁMENES (ANSWER KEY & ESCALA DE NOTA)
    -------------------------------------------------------------------------- */
@@ -2405,6 +2436,7 @@ function saveScannedResultToGradebook() {
     });
 
     saveResultsToStorage();
+    removeMatchedStudentFromRoster(studentName);
     document.getElementById('scannedStudentName').value = '';
     document.getElementById('scannedStudentId').value = '';
     showToast(`${t('toastGradeSaved')}: ${studentName} (${finalGrade.toFixed(2)})`);
@@ -2477,7 +2509,7 @@ function openRosterImporterModal() {
             </p>
             <textarea id="rosterRawTextarea" rows="7" placeholder="APELLIDOS, NOMBRES..." style="width:100%; background:var(--card-inner); color:var(--text); border:1px solid var(--border); border-radius:0.7rem; padding:0.6rem; font-size:0.8rem; margin-bottom:0.65rem;">${studentRoster.join('\n')}</textarea>
             <label class="inline-switch" style="display:flex; margin-bottom:0.4rem;">
-                <input type="checkbox" id="rosterInvertChk" checked>
+                <input type="checkbox" id="rosterInvertChk">
                 <span>Invertir a orden natural ("Nombres Apellidos")</span>
             </label>
             <label class="inline-switch" style="display:flex; margin-bottom:0.75rem;">
@@ -3603,6 +3635,7 @@ Object.assign(window, {
 window.addEventListener('DOMContentLoaded', () => {
     loadStorageData();
     loadStudentRoster();
+    loadAutoRemoveRosterPref();
     applyTheme();
     populateExamFormInputs();
     renderAnswerKeyGrid();
