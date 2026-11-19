@@ -184,7 +184,11 @@
                             <span><i class="fa-solid fa-folder-bookmark text-indigo"></i> <strong id="uiSavedExamsTitle">Mis Exámenes Guardados</strong></span>
                             <span id="savedExamsBadge" class="badge-soft">0</span>
                         </div>
+                        <div class="saved-search-row">
+                            <input type="text" id="savedExamsSearchInput" placeholder="Buscar examen o grado..." oninput="onSavedExamsSearch(this.value)">
+                        </div>
                         <div id="savedExamsList" class="saved-exams-list"></div>
+                        <div id="savedExamsPagination" class="saved-pagination-bar hidden"></div>
                         <div class="saved-footer-btns">
                             <button class="btn-utility" onclick="exportAllDataJSON()">
                                 <i class="fa-solid fa-file-export text-indigo"></i> <span id="uiBtnExportJson">Exportar JSON</span>

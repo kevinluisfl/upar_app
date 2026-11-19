@@ -275,6 +275,12 @@ body {
     align-items: start;
 }
 
+.exams-grid > .studio-card,
+.scanner-grid > .studio-card {
+    min-width: 0;
+    width: 100%;
+}
+
 .form-group {
     display: flex;
     flex-direction: column;
@@ -452,14 +458,40 @@ input:focus, select:focus {
     margin-bottom: 0.65rem;
 }
 
+/*  */
+.saved-search-row {
+    margin-bottom: 0.55rem;
+}
+
+.saved-search-row input {
+    padding: 0.42rem 0.7rem;
+    font-size: 0.78rem;
+}
+
 .saved-exams-list {
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
-    max-height: 200px;
-    overflow-y: auto;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.65rem;
 }
+
+.saved-pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.saved-pagination-btns {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+/*  */
 
 .saved-exam-item {
     background: var(--card);
@@ -509,9 +541,6 @@ input:focus, select:focus {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
     gap: 0.55rem;
-    max-height: 490px;
-    overflow-y: auto;
-    padding-right: 0.25rem;
 }
 
 .key-row-item {
