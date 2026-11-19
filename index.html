@@ -119,6 +119,13 @@
                         <span class="only-mobile-label" id="uiMobileThemeText">Tema</span>
                     </button>
 
+                    <!-- Sincronizar por QR -->
+                    <button type="button" class="btn-suite-util" onclick="openSuiteQrSyncModal(); closeMobileActionsMenu();" title="Sincronizar con QR (PC ↔ Celular)">
+                        <i class="fa-solid fa-qrcode text-indigo"></i>
+                        <span class="hide-md" id="uiBtnSuiteQr">QR Sync</span>
+                        <span class="only-mobile-label" id="uiMobileQrText">QR Sync</span>
+                    </button>
+
                     <!-- Respaldo Maestro Unificado JSON -->
                     <button type="button" class="btn-suite-util" onclick="openBackupModal(); closeMobileActionsMenu();" title="Respaldo Maestro de las 4 Apps">
                         <i class="fa-solid fa-database text-indigo"></i>
@@ -167,6 +174,9 @@
                             </button>
                             <button class="btn-hero-outline" onclick="document.getElementById('masterImportInput').click()">
                                 <i class="fa-solid fa-file-import"></i> <span id="uiBtnHeroImport">Importar Todo</span>
+                            </button>
+                            <button type="button" class="btn-hero-outline" onclick="openSuiteQrSyncModal()">
+                                <i class="fa-solid fa-qrcode text-indigo"></i> <span id="uiBtnHeroQr">QR Sync</span>
                             </button>
                             <input type="file" id="masterImportInput" accept=".json" class="hidden" onchange="handleMasterImportJSON(event)">
                         </div>
@@ -349,6 +359,41 @@
                 </button>
                 <button class="btn-suite-util" onclick="closeBackupModal()" id="uiModalBtnClose">
                     Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+<!-- ==================== MODAL DE SINCRONIZACIÓN QR (PC ↔ CELULAR) ==================== -->
+    <div id="suiteQrModalOverlay" class="suite-modal-overlay hidden">
+        <div class="suite-modal-card suite-qr-hub-card">
+            <h3 id="uiSuiteQrTitle"><i class="fa-solid fa-qrcode text-indigo"></i> Sincronizar con QR (PC ↔ Celular)</h3>
+            <p id="uiSuiteQrSub" class="suite-qr-sub">
+                Funciona tanto con la cámara normal de tu teléfono como con el escáner interno.
+            </p>
+
+            <div class="suite-qr-tabs">
+                <button type="button" class="btn-suite-util suite-qr-tab" id="tabSuiteQrSend">
+                    <i class="fa-solid fa-upload text-indigo"></i>
+                    <span id="uiSuiteQrTabSend">1. Enviar de aquí (QR)</span>
+                </button>
+                <button type="button" class="btn-suite-util suite-qr-tab" id="tabSuiteQrReceive">
+                    <i class="fa-solid fa-download text-emerald"></i>
+                    <span id="uiSuiteQrTabReceive">2. Recibir aquí (QR)</span>
+                </button>
+                <button type="button" class="btn-suite-util suite-qr-tab" id="tabSuiteQrScan">
+                    <i class="fa-solid fa-camera text-amber"></i>
+                    <span id="uiSuiteQrTabScan">3. Escanear con Cámara</span>
+                </button>
+            </div>
+
+            <div id="suiteQrHubBody" class="suite-qr-body">
+                <span class="text-muted-xs">Preparando QR...</span>
+            </div>
+
+            <div class="suite-modal-actions" style="margin-top:0.9rem;">
+                <button type="button" class="btn-suite-util" id="btnCloseSuiteQrHub">
+                    <span id="uiSuiteQrBtnCancel">Cancelar</span>
                 </button>
             </div>
         </div>
