@@ -115,7 +115,7 @@ const I18N = {
         thResGrade: 'Nota Final',
         thResDate: 'Fecha',
         emptyGradebook: 'Aún no hay hojas calificadas en esta vista.',
-        sheetHeaderTitle: 'HOJA DE RESPUESTAS - FORMATO ÓPTICO OMR',
+        sheetHeaderTitle: 'HOJA DE RESPUESTAS',
         sheetStudentLabel: 'NOMBRE COMPLETO DEL ESTUDIANTE:',
         sheetStudentShort: 'Nombre:',
         sheetDateLabel: 'FECHA:',
@@ -240,7 +240,7 @@ const I18N = {
         thResGrade: 'Final Grade',
         thResDate: 'Date',
         emptyGradebook: 'No graded sheets in this view yet.',
-        sheetHeaderTitle: 'OPTICAL ANSWER SHEET - OMR FORMAT',
+        sheetHeaderTitle: 'ANSWER SHEET',
         sheetStudentLabel: 'STUDENT FULL NAME:',
         sheetStudentShort: 'Name:',
         sheetDateLabel: 'DATE:',
@@ -860,8 +860,47 @@ function resolveBestOrientation(copiesCount, questionCount, userSelection) {
     return 'portrait';
 }
 
+function buildSheetQrPayload(ex, isMinimal) {
+    const mode = isMinimal ? 'minimal' : 'full';
+    const safeId = String(ex?.id || 'exam_default').replace(/\|/g, '');
+    return `UPG|${safeId}|${mode}|${ex?.questionCount || 20}`;
+}
+
+function createQrDataUrl(textData, cellSize = 2) {
+    if (!window.qrcode) return '';
+    try {
+        const qr = window.qrcode(0, 'L');
+        qr.addData(textData);
+        qr.make();
+        const count = qr.getModuleCount();
+        const size = count * cellSize;
+        const c = document.createElement('canvas');
+        c.width = size;
+        c.height = size;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, size, size);
+        ctx.fillStyle = '#000000';
+        for (let r = 0; r < count; r++) {
+            for (let col = 0; col < count; col++) {
+                if (qr.isDark(r, col)) {
+                    ctx.fillRect(col * cellSize, r * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+        return c.toDataURL('image/png');
+    } catch (_) {
+        return '';
+    }
+}
+
 function buildSingleSheetHTML(ex, showTeacherKey, isMinimal, copiesCount) {
     const activeLetters = LETTERS.slice(0, ex.optionsCount);
+    const qrPayload = buildSheetQrPayload(ex, isMinimal);
+    const qrImgSrc = createQrDataUrl(qrPayload, 2);
+    const qrInnerHtml = qrImgSrc
+        ? `<img src="${qrImgSrc}" alt="QR Examen">`
+        : `<span style="font-size:0.5rem;font-weight:800;">QR</span>`;
 
     let numCols = ex.questionCount > 30 ? 3 : 2;
     if (isMinimal) {
@@ -906,7 +945,10 @@ function buildSingleSheetHTML(ex, showTeacherKey, isMinimal, copiesCount) {
 
                 <div class="minimal-header-strip">
                     <span>${ex.title} (${ex.course})</span>
-                    <span>${showTeacherKey ? '★ KEY ★' : `${ex.questionCount}Q`}</span>
+                    <div class="sheet-header-right" style="gap:6px;">
+                        <span>${showTeacherKey ? '★ KEY ★' : `${ex.questionCount}Q`}</span>
+                        <div class="minimal-qr-box" data-sheet-qr="${qrPayload}">${qrInnerHtml}</div>
+                    </div>
                 </div>
 
                 <div class="minimal-name-line">
@@ -933,8 +975,11 @@ function buildSingleSheetHTML(ex, showTeacherKey, isMinimal, copiesCount) {
                     <h3>${ex.title}</h3>
                     <p>${t('sheetHeaderTitle')} • ${ex.course}</p>
                 </div>
-                <div class="sheet-code-badge">
-                    ${ex.questionCount} Q | MAX: ${ex.maxGrade}
+                <div class="sheet-header-right">
+                    <div class="sheet-code-badge">
+                        ${ex.questionCount} Q | MAX: ${ex.maxGrade}
+                    </div>
+                    <div class="sheet-qr-box" data-sheet-qr="${qrPayload}">${qrInnerHtml}</div>
                 </div>
             </div>
 
@@ -965,11 +1010,7 @@ function buildSingleSheetHTML(ex, showTeacherKey, isMinimal, copiesCount) {
     `;
 }
 
-
-//BLOQUE CAMBIADO 5 FUNCIONES HASTA ANTES DE LA SESION 4 renderPrintableSheets a downloadSheetAsPNG//
-//FUNCION NUEVA getCleanExamFileName//
-
-function renderPrintableSheets() {
+async function renderPrintableSheets() {
     const ex = appState.activeExam;
     const container = document.getElementById('printableAreaContainer');
     if (!container || !ex) return;
@@ -983,7 +1024,6 @@ function renderPrintableSheets() {
     const isMinimal = styleMode === 'minimal' || copiesCount >= 4;
     const finalOrientation = resolveBestOrientation(copiesCount, ex.questionCount, orientChoice);
 
-    // Configurar regla @page dinámica según Carta (letter) u Oficio (legal: 216mm x 330mm)
     const cssSizeName = paperSize === 'legal' ? 'legal' : 'letter';
     const pageStyleEl = document.getElementById('dynamicPrintPageStyle');
     if (pageStyleEl) {
@@ -1000,6 +1040,19 @@ function renderPrintableSheets() {
 
     const singleCardHtml = buildSingleSheetHTML(ex, showKey, isMinimal, copiesCount);
     container.innerHTML = Array.from({ length: copiesCount }, () => singleCardHtml).join('');
+
+    if (!window.qrcode) {
+        try {
+            await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js', 'qrcode');
+            const qrPayload = buildSheetQrPayload(ex, isMinimal);
+            const dataUrl = createQrDataUrl(qrPayload, 2);
+            if (dataUrl) {
+                container.querySelectorAll('[data-sheet-qr]').forEach(box => {
+                    box.innerHTML = `<img src="${dataUrl}" alt="QR Examen">`;
+                });
+            }
+        } catch (_) {}
+    }
 }
 
 function getCleanExamFileName(ex, prefix = '') {
@@ -1023,36 +1076,33 @@ function getOMRBubbleGeometry(ex, width = 700, height = 920, isMinimal = false) 
         : (ex.questionCount > 30 ? 3 : 2);
     const perCol = Math.ceil(ex.questionCount / numCols);
 
-    const marginX = Math.round((isMinimal ? 30 : 44) * s);
-    const startY = isMinimal
-        ? Math.round(92 * s)
-        : Math.round(198 * s);
-    const bottomPad = Math.round((isMinimal ? 26 : 38) * s);
+    const marginX = Math.round((isMinimal ? 26 : 40) * s);
+    // Cabecera adaptativa: da más aire al nombre en formato simplificado cuando hay altura disponible
+    const minHeaderH = isMinimal ? Math.max(82 * s, height * 0.145) : Math.max(188 * s, height * 0.25);
+    const startY = Math.round(minHeaderH);
+    const bottomPad = Math.round((isMinimal ? 24 : 34) * s);
 
     const availableW = width - marginX * 2;
     const colGap = Math.round((isMinimal ? 12 : 18) * s);
     const colWidth = (availableW - (numCols - 1) * colGap) / numCols;
 
-    const availH = Math.max(120, height - startY - bottomPad);
-    const rowHeight = Math.min(
-        Math.round((isMinimal ? 28 : 34) * s),
-        availH / perCol
-    );
+    // Aprovechar todo el alto libre hasta abajo según la cantidad de preguntas por columna
+    const availH = Math.max(100, height - startY - bottomPad);
+    const rowHeight = availH / perCol;
 
     const labelOffset = Math.round((isMinimal ? 32 : 44) * s);
     const bubbleAreaW = Math.max(40, colWidth - labelOffset - Math.round(8 * s));
     const bubbleSpacing = Math.min(
-        Math.round((isMinimal ? 25 : 32) * s),
+        Math.round((isMinimal ? 34 : 38) * s),
         bubbleAreaW / activeLetters.length
     );
 
-    // El radio depende del menor entre fila y columna para que SIEMPRE sea un círculo perfecto
     const bubbleRadius = Math.max(
         5,
         Math.min(
-            Math.round(rowHeight * 0.34),
-            Math.round(bubbleSpacing * 0.38),
-            Math.round(12 * s)
+            Math.round(rowHeight * 0.36),
+            Math.round(bubbleSpacing * 0.40),
+            Math.round(14.5 * s)
         )
     );
 
@@ -1065,7 +1115,7 @@ function getOMRBubbleGeometry(ex, width = 700, height = 920, isMinimal = false) 
 
         for (let q = startQ; q <= endQ; q++) {
             const rowIdx = q - startQ;
-            const cy = Math.round(startY + rowHeight * 0.55 + rowIdx * rowHeight);
+            const cy = Math.round(startY + rowHeight * 0.5 + rowIdx * rowHeight);
             coords[q] = {};
 
             const bubblesStartX = Math.round(colLeft + labelOffset + bubbleRadius);
@@ -1080,51 +1130,52 @@ function getOMRBubbleGeometry(ex, width = 700, height = 920, isMinimal = false) 
     return { coords, numCols, perCol, marginX, startY, colWidth, colGap, rowHeight, isMinimal, scale: s };
 }
 
-/**
- * Dibuja una tarjeta OMR directamente en el rectángulo (offsetX, offsetY, W, H)
- * usando vectores nítidos sin re-escalar imágenes.
- */
-/**
- * Auxiliar para dividir texto largo en varias líneas dentro de un ancho máximo en Canvas
- */
-function wrapCanvasText(ctx, text, maxWidth) {
-    const words = String(text || '').split(' ');
-    const lines = [];
-    let currentLine = words[0] || '';
+function drawQrVectorOnCanvas(ctx, textData, x, y, size) {
+    if (!window.qrcode) return;
+    const qr = window.qrcode(0, 'L');
+    qr.addData(textData);
+    qr.make();
+    const n = qr.getModuleCount();
 
-    for (let i = 1; i < words.length; i++) {
-        const testLine = currentLine + ' ' + words[i];
-        if (ctx.measureText(testLine).width <= maxWidth) {
-            currentLine = testLine;
-        } else {
-            lines.push(currentLine);
-            currentLine = words[i];
+    // Recuadro blanco exterior + borde fino para lectura óptica limpia
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x, y, size, size);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = Math.max(1, size * 0.025);
+    ctx.strokeRect(x, y, size, size);
+
+    const pad = Math.max(2, Math.round(size * 0.06));
+    const innerSize = size - pad * 2;
+    const cell = innerSize / n;
+
+    ctx.fillStyle = '#000000';
+    for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+            if (qr.isDark(r, c)) {
+                ctx.fillRect(
+                    x + pad + c * cell,
+                    y + pad + r * cell,
+                    Math.ceil(cell * 100) / 100,
+                    Math.ceil(cell * 100) / 100
+                );
+            }
         }
     }
-    if (currentLine) lines.push(currentLine);
-    return lines;
 }
 
-/**
- * Dibuja una tarjeta OMR directamente en el rectángulo (offsetX, offsetY, W, H)
- * replicando exactamente el diseño de la vista previa HTML sin desbordamientos.
- */
 function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = null, isMinimal = false) {
     ctx.save();
     ctx.translate(offsetX, offsetY);
 
-    // Recortar cualquier exceso fuera de la tarjeta por seguridad
     ctx.beginPath();
     ctx.rect(0, 0, W, H);
     ctx.clip();
 
     const s = Math.min(W / 560, H / 720);
 
-    // Fondo blanco de la tarjeta
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, W, H);
 
-    // Borde exterior de la tarjeta
     ctx.strokeStyle = isMinimal ? '#64748b' : '#334155';
     ctx.lineWidth = Math.max(1, 1.5 * s);
     if (isMinimal) ctx.setLineDash([5 * s, 4 * s]);
@@ -1145,43 +1196,51 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
     const innerW = W - mx * 2;
 
     if (isMinimal) {
-        const headerY = fMargin + fSize + Math.round(12 * s);
-        ctx.fillStyle = '#000000';
-        ctx.font = `800 ${Math.max(9, Math.round(12 * s))}px Inter, sans-serif`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
+        // QR reservado arriba a la derecha con tamaño nítido para impresión
+        const qrSize = Math.max(48, Math.round(52 * s));
+        const qrX = W - mx - qrSize;
+        const qrY = fMargin + Math.round(4 * s);
+        drawQrVectorOnCanvas(ctx, buildSheetQrPayload(ex, true), qrX, qrY, qrSize);
 
         const rightTag = simulatedAnswers ? '★ KEY ★' : `${ex.questionCount}Q`;
-        const maxTitleW = innerW - ctx.measureText(rightTag).width - Math.round(12 * s);
+        ctx.fillStyle = '#000000';
+        ctx.font = `800 ${Math.max(10, Math.round(12.5 * s))}px Inter, sans-serif`;
+        ctx.textBaseline = 'alphabetic';
+
+        const tagX = qrX - Math.round(10 * s);
+        const headerY = qrY + Math.round(qrSize * 0.56);
+        ctx.textAlign = 'right';
+        ctx.fillText(rightTag, tagX, headerY);
+
+        const maxTitleW = Math.max(60, tagX - ctx.measureText(rightTag).width - mx - Math.round(10 * s));
+        ctx.textAlign = 'left';
         let titleText = `${ex.title} (${ex.course})`;
         while (ctx.measureText(titleText).width > maxTitleW && titleText.length > 8) {
             titleText = titleText.slice(0, -2) + '…';
         }
         ctx.fillText(titleText, mx, headerY);
 
-        ctx.textAlign = 'right';
-        ctx.fillText(rightTag, W - mx, headerY);
-
+        const lineSepY = qrY + qrSize + Math.round(5 * s);
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = Math.max(1, 1.4 * s);
         ctx.beginPath();
-        ctx.moveTo(mx, headerY + Math.round(5 * s));
-        ctx.lineTo(W - mx, headerY + Math.round(5 * s));
+        ctx.moveTo(mx, lineSepY);
+        ctx.lineTo(W - mx, lineSepY);
         ctx.stroke();
 
-        // Línea de Nombre y Nota con líneas dibujadas sin desbordar
-        const nameY = headerY + Math.round(23 * s);
+        // Línea de Nombre y Nota debajo del separador
+        const nameY = Math.max(lineSepY + Math.round(17 * s), Math.round(geom.startY - 12 * s));
         ctx.textAlign = 'left';
-        ctx.font = `700 ${Math.max(8, Math.round(10.5 * s))}px Inter, sans-serif`;
+        ctx.font = `700 ${Math.max(8.5, Math.round(11 * s))}px Inter, sans-serif`;
 
         const nameLbl = `${t('sheetStudentShort')} `;
         const gradeLbl = `${t('sheetGradeLabel')} `;
-        const gradeBlockW = Math.round(78 * s);
-        const nameBlockEnd = W - mx - gradeBlockW - Math.round(10 * s);
+        const gradeBlockW = Math.round(86 * s);
+        const nameBlockEnd = W - mx - gradeBlockW - Math.round(12 * s);
 
         ctx.fillText(nameLbl, mx, nameY);
-        const nameLineStart = mx + ctx.measureText(nameLbl).width + Math.round(3 * s);
-        ctx.lineWidth = Math.max(0.9, 1 * s);
+        const nameLineStart = mx + ctx.measureText(nameLbl).width + Math.round(4 * s);
+        ctx.lineWidth = Math.max(0.9, 1.1 * s);
         ctx.beginPath();
         ctx.moveTo(nameLineStart, nameY + Math.round(2 * s));
         ctx.lineTo(nameBlockEnd, nameY + Math.round(2 * s));
@@ -1189,26 +1248,32 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
 
         const gradeStartX = W - mx - gradeBlockW;
         ctx.fillText(gradeLbl, gradeStartX, nameY);
-        const gradeLineStart = gradeStartX + ctx.measureText(gradeLbl).width + Math.round(3 * s);
+        const gradeLineStart = gradeStartX + ctx.measureText(gradeLbl).width + Math.round(4 * s);
         ctx.beginPath();
         ctx.moveTo(gradeLineStart, nameY + Math.round(2 * s));
         ctx.lineTo(W - mx, nameY + Math.round(2 * s));
         ctx.stroke();
     } else {
-        // 1. CAJA SUPERIOR DE TÍTULO + RECUADRO DE CÓDIGO (20 Q | MAX: 10)
+        // 1. CAJA SUPERIOR DE TÍTULO + RECUADRO DE PREGUNTAS + QR A LA DERECHA SIN SOLAPAR
         const boxTop = Math.round(34 * s);
-        const boxH = Math.round(48 * s);
+        const boxH = Math.round(54 * s);
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = Math.max(1.2, 1.8 * s);
         ctx.strokeRect(mx, boxTop, innerW, boxH);
 
-        // Recuadro derecho: "20 Q | MAX: 10"
+        // QR a la derecha dentro del encabezado
+        const qrSize = Math.max(42, Math.round(44 * s));
+        const qrX = W - mx - qrSize - Math.round(8 * s);
+        const qrY = boxTop + Math.round((boxH - qrSize) / 2);
+        drawQrVectorOnCanvas(ctx, buildSheetQrPayload(ex, false), qrX, qrY, qrSize);
+
+        // Recuadro "20 Q | MAX: 10" colocado a la izquierda del QR con margen
         const badgeText = `${ex.questionCount} Q | MAX: ${ex.maxGrade}`;
         ctx.font = `800 ${Math.max(8, Math.round(10 * s))}px "JetBrains Mono", monospace`;
         const badgePadX = Math.round(8 * s);
         const badgeW = Math.ceil(ctx.measureText(badgeText).width + badgePadX * 2);
         const badgeH = Math.round(22 * s);
-        const badgeX = W - mx - badgeW - Math.round(10 * s);
+        const badgeX = qrX - badgeW - Math.round(10 * s);
         const badgeY = boxTop + Math.round((boxH - badgeH) / 2);
 
         ctx.lineWidth = Math.max(1, 1.4 * s);
@@ -1218,29 +1283,29 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
         ctx.textBaseline = 'middle';
         ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 0.5 * s);
 
-        // Título y subtítulo a la izquierda (truncando si es muy largo para no chocar con el badge)
-        const maxLeftTextW = badgeX - (mx + Math.round(16 * s));
+        // Título y curso/asignatura a la izquierda (sin texto redundante de formato OMR)
+        const maxLeftTextW = Math.max(80, badgeX - (mx + Math.round(18 * s)));
         ctx.textAlign = 'left';
         ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = '#000000';
-        ctx.font = `800 ${Math.max(10, Math.round(14 * s))}px Inter, sans-serif`;
+        ctx.font = `800 ${Math.max(10.5, Math.round(14.5 * s))}px Inter, sans-serif`;
         let mainTitle = ex.title.toUpperCase();
         while (ctx.measureText(mainTitle).width > maxLeftTextW && mainTitle.length > 6) {
             mainTitle = mainTitle.slice(0, -2) + '…';
         }
-        ctx.fillText(mainTitle, mx + Math.round(12 * s), boxTop + Math.round(20 * s));
+        ctx.fillText(mainTitle, mx + Math.round(12 * s), boxTop + Math.round(23 * s));
 
-        ctx.font = `600 ${Math.max(8, Math.round(10 * s))}px Inter, sans-serif`;
+        ctx.font = `700 ${Math.max(8.5, Math.round(10.8 * s))}px Inter, sans-serif`;
         ctx.fillStyle = '#334155';
         let subTitle = `${t('sheetHeaderTitle')} • ${ex.course}`;
         while (ctx.measureText(subTitle).width > maxLeftTextW && subTitle.length > 8) {
             subTitle = subTitle.slice(0, -2) + '…';
         }
-        ctx.fillText(subTitle, mx + Math.round(12 * s), boxTop + Math.round(37 * s));
+        ctx.fillText(subTitle, mx + Math.round(12 * s), boxTop + Math.round(41 * s));
 
-        // 2. CAJA DE ESTUDIANTE / FECHA / NOTA (3 columnas con etiqueta arriba y línea abajo)
+        // 2. CAJA DE ESTUDIANTE / FECHA / NOTA
         const stTop = boxTop + boxH + Math.round(8 * s);
-        const stH = Math.round(44 * s);
+        const stH = Math.round(46 * s);
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = Math.max(1, 1.4 * s);
         ctx.strokeRect(mx, stTop, innerW, stH);
@@ -1248,8 +1313,8 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
         const padIn = Math.round(10 * s);
         const colGapSt = Math.round(12 * s);
         const usableStW = innerW - padIn * 2 - colGapSt * 2;
-        const wCol1 = Math.floor(usableStW * 0.50);
-        const wCol2 = Math.floor(usableStW * 0.25);
+        const wCol1 = Math.floor(usableStW * 0.52);
+        const wCol2 = Math.floor(usableStW * 0.24);
         const wCol3 = usableStW - wCol1 - wCol2;
 
         const xCol1 = mx + padIn;
@@ -1279,7 +1344,7 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
         ctx.lineTo(xCol3 + wCol3, lineY);
         ctx.stroke();
 
-        // 3. BARRA DE INSTRUCCIONES (Con ajuste de línea automático + OMR-ICFES a la derecha)
+        // 3. BARRA DE INSTRUCCIONES
         const instTop = stTop + stH + Math.round(8 * s);
         const instH = Math.round(32 * s);
         ctx.fillStyle = '#f1f5f9';
@@ -1288,7 +1353,6 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
         ctx.lineWidth = Math.max(0.9, 1.1 * s);
         ctx.strokeRect(mx, instTop, innerW, instH);
 
-        // Sello derecho "OMR-ICFES" o "★ KEY ★"
         const rightStamp = simulatedAnswers ? '★ KEY ★' : 'OMR-ICFES';
         ctx.fillStyle = '#0f172a';
         ctx.font = `800 ${Math.max(7.5, Math.round(9 * s))}px Inter, sans-serif`;
@@ -1297,7 +1361,6 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
         ctx.textBaseline = 'middle';
         ctx.fillText(rightStamp, W - mx - Math.round(10 * s), instTop + instH / 2);
 
-        // Texto de recomendación con salto de línea (máximo 2 líneas dentro del ancho disponible)
         ctx.textAlign = 'left';
         ctx.font = `600 ${Math.max(7.5, Math.round(8.8 * s))}px Inter, sans-serif`;
         const maxInstTextW = innerW - stampW - Math.round(20 * s);
@@ -1317,7 +1380,7 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
 
     // 4. RECUADROS DE COLUMNAS Y BURBUJAS DE RESPUESTA
     const activeLetters = LETTERS.slice(0, ex.optionsCount);
-    const colBoxH = Math.round(geom.perCol * geom.rowHeight + 10 * s);
+    const colBoxH = Math.round(geom.perCol * geom.rowHeight + 8 * s);
 
     for (let c = 0; c < geom.numCols; c++) {
         const colLeft = geom.marginX + c * (geom.colWidth + geom.colGap);
@@ -1329,7 +1392,7 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
     for (let q = 1; q <= ex.questionCount; q++) {
         const firstBubble = geom.coords[q]['A'];
         ctx.fillStyle = '#000000';
-        ctx.font = `800 ${Math.max(8, Math.round((isMinimal ? 10.5 : 12) * s))}px "JetBrains Mono", monospace`;
+        ctx.font = `800 ${Math.max(8, Math.round((isMinimal ? 11 : 12) * s))}px "JetBrains Mono", monospace`;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
         ctx.fillText(String(q).padStart(2, '0'), firstBubble.x - firstBubble.r - Math.round(8 * s), firstBubble.y);
@@ -1355,6 +1418,103 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
     }
 
     ctx.restore();
+}
+
+async function downloadSheetAsPNG() {
+    const ex = appState.activeExam;
+    if (!ex) return;
+
+    try {
+        await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js', 'qrcode');
+    } catch (_) {}
+
+    const { masterCanvas, copiesCount, paperSize } = buildHighResSheetPageCanvas();
+    const cleanFileName = getCleanExamFileName(ex);
+
+    const a = document.createElement('a');
+    a.href = masterCanvas.toDataURL('image/png');
+    a.download = `${cleanFileName} (${copiesCount}x ${paperSize === 'legal' ? 'Oficio' : 'Carta'}).png`;
+    a.click();
+}
+
+async function printAnswerSheet() {
+    switchView('sheet');
+    renderPrintableSheets();
+
+    const ex = appState.activeExam;
+    if (!ex) return;
+
+    try {
+        await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js', 'qrcode');
+    } catch (_) {}
+
+    const cleanTitle = getCleanExamFileName(ex);
+    const { masterCanvas, copiesCount, paperSize, finalOrientation } = buildHighResSheetPageCanvas();
+    const imgDataUrl = masterCanvas.toDataURL('image/png');
+
+    try {
+        const jsPDF = await ensureJsPdfLoaded();
+        const formatDims = paperSize === 'legal' ? [215.9, 330.2] : [215.9, 279.4];
+        const pdf = new jsPDF({
+            orientation: finalOrientation === 'landscape' ? 'l' : 'p',
+            unit: 'mm',
+            format: formatDims
+        });
+
+        const pdfW = pdf.internal.pageSize.getWidth();
+        const pdfH = pdf.internal.pageSize.getHeight();
+        pdf.setProperties({ title: cleanTitle });
+        pdf.addImage(imgDataUrl, 'PNG', 0, 0, pdfW, pdfH);
+
+        const pdfBlob = pdf.output('blob');
+        const blobUrl = URL.createObjectURL(pdfBlob);
+
+        openPdfPreviewModal(cleanTitle, blobUrl, pdf, copiesCount, paperSize);
+    } catch (err) {
+        const prevTitle = document.title;
+        let prevTopTitle = null;
+        document.title = cleanTitle;
+        try {
+            if (window.top && window.top.document) {
+                prevTopTitle = window.top.document.title;
+                window.top.document.title = cleanTitle;
+            }
+        } catch (_) {}
+        window.print();
+        setTimeout(() => {
+            document.title = prevTitle;
+            try {
+                if (prevTopTitle && window.top && window.top.document) {
+                    window.top.document.title = prevTopTitle;
+                }
+            } catch (_) {}
+        }, 1000);
+    }
+}
+
+/**
+ * Dibuja una tarjeta OMR directamente en el rectángulo (offsetX, offsetY, W, H)
+ * usando vectores nítidos sin re-escalar imágenes.
+ */
+/**
+ * Auxiliar para dividir texto largo en varias líneas dentro de un ancho máximo en Canvas
+ */
+function wrapCanvasText(ctx, text, maxWidth) {
+    const words = String(text || '').split(' ');
+    const lines = [];
+    let currentLine = words[0] || '';
+
+    for (let i = 1; i < words.length; i++) {
+        const testLine = currentLine + ' ' + words[i];
+        if (ctx.measureText(testLine).width <= maxWidth) {
+            currentLine = testLine;
+        } else {
+            lines.push(currentLine);
+            currentLine = words[i];
+        }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines;
 }
 
 function drawOMRSheetToCanvas(canvas, ex, simulatedAnswers = null, isMinimal = false) {
@@ -1418,19 +1578,6 @@ function buildHighResSheetPageCanvas() {
     return { masterCanvas, copiesCount, paperSize, finalOrientation };
 }
 
-function downloadSheetAsPNG() {
-    const ex = appState.activeExam;
-    if (!ex) return;
-
-    const { masterCanvas, copiesCount, paperSize } = buildHighResSheetPageCanvas();
-    const cleanFileName = getCleanExamFileName(ex);
-
-    const a = document.createElement('a');
-    a.href = masterCanvas.toDataURL('image/png');
-    a.download = `${cleanFileName} (${copiesCount}x ${paperSize === 'legal' ? 'Oficio' : 'Carta'}).png`;
-    a.click();
-}
-
 /**
  * Carga jsPDF bajo demanda (0 impacto en Lighthouse inicial) y abre una ventana
  * de Previsualización PDF con el nombre real del Examen + Grado para Descargar o Imprimir.
@@ -1444,59 +1591,6 @@ async function ensureJsPdfLoaded() {
         script.onerror = reject;
         document.head.appendChild(script);
     });
-}
-
-async function printAnswerSheet() {
-    switchView('sheet');
-    renderPrintableSheets();
-
-    const ex = appState.activeExam;
-    if (!ex) return;
-
-    const cleanTitle = getCleanExamFileName(ex);
-    const { masterCanvas, copiesCount, paperSize, finalOrientation } = buildHighResSheetPageCanvas();
-    const imgDataUrl = masterCanvas.toDataURL('image/jpeg', 0.95);
-
-    try {
-        const jsPDF = await ensureJsPdfLoaded();
-        // Tamaño exacto en milímetros: Carta (215.9 x 279.4) u Oficio (215.9 x 330.2)
-        const formatDims = paperSize === 'legal' ? [215.9, 330.2] : [215.9, 279.4];
-        const pdf = new jsPDF({
-            orientation: finalOrientation === 'landscape' ? 'l' : 'p',
-            unit: 'mm',
-            format: formatDims
-        });
-
-        const pdfW = pdf.internal.pageSize.getWidth();
-        const pdfH = pdf.internal.pageSize.getHeight();
-        pdf.setProperties({ title: cleanTitle });
-        pdf.addImage(imgDataUrl, 'JPEG', 0, 0, pdfW, pdfH);
-
-        const pdfBlob = pdf.output('blob');
-        const blobUrl = URL.createObjectURL(pdfBlob);
-
-        openPdfPreviewModal(cleanTitle, blobUrl, pdf, copiesCount, paperSize);
-    } catch (err) {
-        // Respaldo nativo cambiando también window.top.document.title si está en Suite
-        const prevTitle = document.title;
-        let prevTopTitle = null;
-        document.title = cleanTitle;
-        try {
-            if (window.top && window.top.document) {
-                prevTopTitle = window.top.document.title;
-                window.top.document.title = cleanTitle;
-            }
-        } catch (_) {}
-        window.print();
-        setTimeout(() => {
-            document.title = prevTitle;
-            try {
-                if (prevTopTitle && window.top && window.top.document) {
-                    window.top.document.title = prevTopTitle;
-                }
-            } catch (_) {}
-        }, 1000);
-    }
 }
 
 function openPdfPreviewModal(cleanTitle, blobUrl, pdfInstance, copiesCount, paperSize) {
@@ -1738,14 +1832,25 @@ function stopCameraStream() {
     if (btnCam) btnCam.textContent = t('btnCameraOn');
 }
 
+let scannerViewportOrientation = 'portrait';
+
+function toggleScannerViewportOrientation() {
+    scannerViewportOrientation = scannerViewportOrientation === 'portrait' ? 'landscape' : 'portrait';
+    const wrapper = document.querySelector('.scanner-viewport-wrapper');
+    const lbl = document.getElementById('uiScannerOrientLabel');
+    const isLand = scannerViewportOrientation === 'landscape';
+
+    if (wrapper) wrapper.classList.toggle('is-landscape', isLand);
+    if (lbl) lbl.textContent = isLand ? 'Marco: Horizontal' : 'Marco: Vertical';
+}
+
 function captureFromVideoAndScan() {
     const video = document.getElementById('scannerVideo');
     if (!video || !video.videoWidth || !video.videoHeight) return;
 
     const vw = video.videoWidth;
     const vh = video.videoHeight;
-    // En vertical (retrato), si el sensor entrega más ancho que alto, recortamos al centro con proporción 3:4
-    const targetAspect = 3 / 4;
+    const targetAspect = scannerViewportOrientation === 'landscape' ? (4 / 3) : (3 / 4);
     const srcAspect = vw / vh;
 
     let sx = 0, sy = 0, sw = vw, sh = vh;
@@ -2082,12 +2187,32 @@ function measureSheetFormatConfidence(warpedCanvas, ex, isMinimal) {
  * 2) Auto-detecta si la hoja impresa es Formato Completo o Simplificado.
  * 3) Endereza la perspectiva y califica.
  */
-function processRawPhotoThroughHomography(rawCanvas) {
-    const destW = 700;
-    const destH = 920;
+async function processRawPhotoThroughHomography(rawCanvas) {
     const ex = appState.activeExam;
-
     appState.scanner.rawPhotoCanvas = rawCanvas;
+
+    let matchedExam = ex;
+    let qrForcedMinimal = null;
+
+    try {
+        await loadScriptOnce('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js', 'jsQR');
+        const rCtx = rawCanvas.getContext('2d');
+        const rImg = rCtx.getImageData(0, 0, rawCanvas.width, rawCanvas.height);
+        const qrCode = window.jsQR(rImg.data, rImg.width, rImg.height, { inversionAttempts: 'attemptBoth' });
+        if (qrCode && typeof qrCode.data === 'string' && qrCode.data.startsWith('UPG|')) {
+            const [, qrExamId, qrStyle] = qrCode.data.split('|');
+            const foundEx = appState.exams.find(item => item.id === qrExamId);
+            if (foundEx && foundEx.id !== appState.activeExam?.id) {
+                appState.activeExam = JSON.parse(JSON.stringify(foundEx));
+                localStorage.setItem(STORAGE_KEYS.ACTIVE_EXAM_ID, foundEx.id);
+                populateExamFormInputs();
+                renderAnswerKeyGrid();
+                matchedExam = appState.activeExam;
+            }
+            if (qrStyle === 'minimal') qrForcedMinimal = true;
+            else if (qrStyle === 'full') qrForcedMinimal = false;
+        }
+    } catch (_) {}
 
     let corners = detectFiducialCornersInPhoto(rawCanvas);
     if (!corners) {
@@ -2101,14 +2226,27 @@ function processRawPhotoThroughHomography(rawCanvas) {
     }
     appState.scanner.fiducialCorners = corners;
 
+    const detectedW = Math.hypot(corners.tr.x - corners.tl.x, corners.tr.y - corners.tl.y);
+    const detectedH = Math.hypot(corners.bl.x - corners.tl.x, corners.bl.y - corners.tl.y);
+    const isCardLandscape = detectedW > detectedH * 1.08;
+
+    const destW = isCardLandscape ? 920 : 700;
+    const destH = isCardLandscape ? 700 : 920;
+
+    const scannerCanvas = document.getElementById('omrScannerCanvas');
+    if (scannerCanvas) {
+        scannerCanvas.width = destW;
+        scannerCanvas.height = destH;
+    }
+
     // Probar ambos formatos (Completo vs Simplificado) y elegir automáticamente el que mejor calza con los círculos impresos
     const warpedFull = warpSheetPerspectiveToCanonical(rawCanvas, corners, destW, destH, false);
     const warpedMin = warpSheetPerspectiveToCanonical(rawCanvas, corners, destW, destH, true);
 
-    const scoreFull = measureSheetFormatConfidence(warpedFull, ex, false);
-    const scoreMin = measureSheetFormatConfidence(warpedMin, ex, true);
+    const scoreFull = measureSheetFormatConfidence(warpedFull, matchedExam, false);
+    const scoreMin = measureSheetFormatConfidence(warpedMin, matchedExam, true);
 
-    const isMinimalDetected = scoreMin > scoreFull * 1.04;
+    const isMinimalDetected = qrForcedMinimal !== null ? qrForcedMinimal : (scoreMin > scoreFull * 1.04);
     appState.scanner.detectedSheetMinimal = isMinimalDetected;
     appState.scanner.lastImageSource = isMinimalDetected ? warpedMin : warpedFull;
 

@@ -309,10 +309,17 @@
                     <!-- Controles de Entrada del Escáner -->
                     <div class="scanner-controls-bar">
                         <!-- Dentro de .scanner-controls-bar (en upargrade/index.html) -->
-                        <label class="inline-switch" style="margin-left:auto;">
-                            <input type="checkbox" id="autoCaptureSheetToggle" checked>
-                            <span>Auto-captura</span>
-                        </label>
+                        <div style="display:flex; align-items:center; gap:0.55rem; margin-left:auto; flex-wrap:wrap;">
+                            <button type="button" id="btnToggleScannerOrientation" class="btn-utility" onclick="toggleScannerViewportOrientation()" title="Cambiar orientación del encuadre del escáner">
+                                <i class="fa-solid fa-rotate text-indigo"></i>
+                                <span id="uiScannerOrientLabel">Marco: Vertical</span>
+                            </button>
+                            <label class="inline-switch">
+                                <input type="checkbox" id="autoCaptureSheetToggle" checked>
+                                <span>Auto-captura</span>
+                            </label>
+                        </div>
+
                         <button id="btnStartCamera" class="btn-primary-md" onclick="toggleCameraStream()">
                             <i class="fa-solid fa-video"></i> <span id="uiBtnCameraToggle">Activar Cámara</span>
                         </button>
