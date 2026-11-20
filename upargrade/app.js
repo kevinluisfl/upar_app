@@ -1838,7 +1838,7 @@ function startLiveFiducialLoop() {
                 }
 
                 const elapsedMs = now - holdStartTime;
-                const remainingSec = Math.max(0.1, ((1500 - elapsedMs) / 1000)).toFixed(1);
+                const remainingSec = Math.max(0.1, ((2000 - elapsedMs) / 1000)).toFixed(1);
 
                 guide?.classList.add('is-locked');
                 if (pill) {
@@ -1851,7 +1851,7 @@ function startLiveFiducialLoop() {
                     }
                 }
 
-                if (autoChk?.checked && elapsedMs >= 1500) {
+                if (autoChk?.checked && elapsedMs >= 2000) {
                     isAutoCapturing = true;
                     holdStartTime = null;
                     focusTriggeredForLock = false;
