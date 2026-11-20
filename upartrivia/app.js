@@ -3258,6 +3258,54 @@ async function checkIncomingTriviaQrParams() {
     }, 300);
 }
 
+function enableDropZone(dropZoneEl, fileInputEl, onFileDropped) {
+    if (!dropZoneEl || !fileInputEl || typeof onFileDropped !== 'function') return;
+    if (dropZoneEl.dataset.dropBound === '1') return;
+    dropZoneEl.dataset.dropBound = '1';
+
+    const preventDefaults = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    ['dragenter', 'dragover'].forEach(evtName => {
+        dropZoneEl.addEventListener(evtName, (e) => {
+            preventDefaults(e);
+            dropZoneEl.classList.add('is-drag-over');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(evtName => {
+        dropZoneEl.addEventListener(evtName, (e) => {
+            preventDefaults(e);
+            if (evtName === 'dragleave' && dropZoneEl.contains(e.relatedTarget)) return;
+            dropZoneEl.classList.remove('is-drag-over');
+        });
+    });
+
+    dropZoneEl.addEventListener('drop', (e) => {
+        const files = e.dataTransfer?.files;
+        if (!files || !files.length) return;
+        onFileDropped(files[0]);
+    });
+}
+
+function initTriviaBulkDropZone() {
+    const dropZone = document.querySelector('#fmtGuideExcel')?.closest('.studio-card') || document.querySelector('.bulk-input-area');
+    const fileInput = document.getElementById('bulkFileInput');
+    if (!dropZone || !fileInput) return;
+
+    enableDropZone(dropZone, fileInput, (file) => {
+        if (typeof handleBulkFileUpload === 'function') {
+            handleBulkFileUpload({ target: { files: [file], value: '' } });
+        } else {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;
+            fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+}
 /* --------------------------------------------------------------------------
    11. EXPOSICIÓN EXPLÍCITA AL ÁMBITO GLOBAL (WINDOW) Y ARRANQUE
    -------------------------------------------------------------------------- */
@@ -3315,6 +3363,7 @@ window.addEventListener('DOMContentLoaded', () => {
     updateLobbySelectors();
     handleBulkModeChange();
     checkIncomingTriviaQrParams();
+    initTriviaBulkDropZone();
 
     document.getElementById('btnThemeToggle').addEventListener('click', () => {
         appState.theme = appState.theme === 'dark' ? 'light' : 'dark';
