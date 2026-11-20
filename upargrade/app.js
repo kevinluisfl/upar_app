@@ -19,7 +19,7 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E'];
    -------------------------------------------------------------------------- */
 const I18N = {
     es: {
-        mainSubtitle: 'Generador de hojas de respuesta y calificación óptica automatizada',
+        mainSubtitle: 'Generador de hojas de respuesta y calificación óptica',
         navExams: '1. Examen y Clave',
         navSheet: '2. Hoja ICFES',
         navScanner: '3. Escáner OMR',
@@ -160,7 +160,7 @@ const I18N = {
         btnApplyCorners: 'Aplicar'
     },
     en: {
-        mainSubtitle: 'OMR answer sheet generator and automated optical grading',
+        mainSubtitle: 'OMR answer sheet generator and optical grading',
         navExams: '1. Exam & Key',
         navSheet: '2. OMR Sheet',
         navScanner: '3. OMR Scanner',
@@ -983,11 +983,6 @@ function createQrDataUrl(textData, cellSize = 2) {
 
 function buildSingleSheetHTML(ex, showTeacherKey, isMinimal, copiesCount) {
     const activeLetters = LETTERS.slice(0, ex.optionsCount);
-    const qrPayload = buildSheetQrPayload(ex, isMinimal);
-    const qrImgSrc = createQrDataUrl(qrPayload, 2);
-    const qrInnerHtml = qrImgSrc
-        ? `<img src="${qrImgSrc}" alt="QR Examen">`
-        : `<span style="font-size:0.5rem;font-weight:800;">QR</span>`;
 
     let numCols = ex.questionCount > 30 ? 3 : 2;
     if (isMinimal) {
@@ -1033,8 +1028,7 @@ function buildSingleSheetHTML(ex, showTeacherKey, isMinimal, copiesCount) {
                 <div class="minimal-header-strip">
                     <span>${ex.title} (${ex.course})</span>
                     <div class="sheet-header-right" style="gap:6px;">
-                        <span>${showTeacherKey ? '★ KEY ★' : `${ex.questionCount}Q`}</span>
-                        <div class="minimal-qr-box" data-sheet-qr="${qrPayload}">${qrInnerHtml}</div>
+                        <span>${showTeacherKey ? '★ KEY ★' : `${ex.questionCount}Q`}</span>    
                     </div>
                 </div>
 
@@ -1066,7 +1060,6 @@ function buildSingleSheetHTML(ex, showTeacherKey, isMinimal, copiesCount) {
                     <div class="sheet-code-badge">
                         ${ex.questionCount} Q | MAX: ${ex.maxGrade}
                     </div>
-                    <div class="sheet-qr-box" data-sheet-qr="${qrPayload}">${qrInnerHtml}</div>
                 </div>
             </div>
 
@@ -1127,19 +1120,6 @@ async function renderPrintableSheets() {
 
     const singleCardHtml = buildSingleSheetHTML(ex, showKey, isMinimal, copiesCount);
     container.innerHTML = Array.from({ length: copiesCount }, () => singleCardHtml).join('');
-
-    if (!window.qrcode) {
-        try {
-            await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js', 'qrcode');
-            const qrPayload = buildSheetQrPayload(ex, isMinimal);
-            const dataUrl = createQrDataUrl(qrPayload, 2);
-            if (dataUrl) {
-                container.querySelectorAll('[data-sheet-qr]').forEach(box => {
-                    box.innerHTML = `<img src="${dataUrl}" alt="QR Examen">`;
-                });
-            }
-        } catch (_) {}
-    }
 }
 
 function getCleanExamFileName(ex, prefix = '') {
@@ -1284,20 +1264,14 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
     const mx = geom.marginX;
     const innerW = W - mx * 2;
 
-    if (isMinimal) {
-        // QR reservado arriba a la derecha con tamaño nítido para impresión
-        const qrSize = Math.max(48, Math.round(52 * s));
-        const qrX = W - mx - qrSize;
-        const qrY = fMargin + Math.round(4 * s);
-        drawQrVectorOnCanvas(ctx, buildSheetQrPayload(ex, true), qrX, qrY, qrSize);
-
+if (isMinimal) {
         const rightTag = simulatedAnswers ? '★ KEY ★' : `${ex.questionCount}Q`;
         ctx.fillStyle = '#000000';
         ctx.font = `800 ${Math.max(10, Math.round(12.5 * s))}px Inter, sans-serif`;
         ctx.textBaseline = 'alphabetic';
 
-        const tagX = qrX - Math.round(10 * s);
-        const headerY = qrY + Math.round(qrSize * 0.56);
+        const tagX = W - mx;
+        const headerY = fMargin + Math.round(24 * s);
         ctx.textAlign = 'right';
         ctx.fillText(rightTag, tagX, headerY);
 
@@ -1309,7 +1283,7 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
         }
         ctx.fillText(titleText, mx, headerY);
 
-        const lineSepY = qrY + qrSize + Math.round(5 * s);
+        const lineSepY = headerY + Math.round(8 * s);
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = Math.max(1, 1.4 * s);
         ctx.beginPath();
@@ -1350,19 +1324,13 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
         ctx.lineWidth = Math.max(1.2, 1.8 * s);
         ctx.strokeRect(mx, boxTop, innerW, boxH);
 
-        // QR a la derecha dentro del encabezado
-        const qrSize = Math.max(42, Math.round(44 * s));
-        const qrX = W - mx - qrSize - Math.round(8 * s);
-        const qrY = boxTop + Math.round((boxH - qrSize) / 2);
-        drawQrVectorOnCanvas(ctx, buildSheetQrPayload(ex, false), qrX, qrY, qrSize);
-
         // Recuadro "20 Q | MAX: 10" colocado a la izquierda del QR con margen
         const badgeText = `${ex.questionCount} Q | MAX: ${ex.maxGrade}`;
         ctx.font = `800 ${Math.max(8, Math.round(10 * s))}px "JetBrains Mono", monospace`;
         const badgePadX = Math.round(8 * s);
         const badgeW = Math.ceil(ctx.measureText(badgeText).width + badgePadX * 2);
         const badgeH = Math.round(22 * s);
-        const badgeX = qrX - badgeW - Math.round(10 * s);
+        const badgeX = W - mx - badgeW - Math.round(8 * s);
         const badgeY = boxTop + Math.round((boxH - badgeH) / 2);
 
         ctx.lineWidth = Math.max(1, 1.4 * s);
@@ -1513,10 +1481,6 @@ async function downloadSheetAsPNG() {
     const ex = appState.activeExam;
     if (!ex) return;
 
-    try {
-        await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js', 'qrcode');
-    } catch (_) {}
-
     const { masterCanvas, copiesCount, paperSize } = buildHighResSheetPageCanvas();
     const cleanFileName = getCleanExamFileName(ex);
 
@@ -1532,10 +1496,6 @@ async function printAnswerSheet() {
 
     const ex = appState.activeExam;
     if (!ex) return;
-
-    try {
-        await loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js', 'qrcode');
-    } catch (_) {}
 
     const cleanTitle = getCleanExamFileName(ex);
     const { masterCanvas, copiesCount, paperSize, finalOrientation } = buildHighResSheetPageCanvas();
@@ -1553,7 +1513,7 @@ async function printAnswerSheet() {
         const pdfW = pdf.internal.pageSize.getWidth();
         const pdfH = pdf.internal.pageSize.getHeight();
         pdf.setProperties({ title: cleanTitle });
-        pdf.addImage(imgDataUrl, 'PNG', 0, 0, pdfW, pdfH);
+        pdf.addImage(imgDataUrl, 'PNG', 0, 0, pdfW, pdfH, undefined, 'FAST');
 
         const pdfBlob = pdf.output('blob');
         const blobUrl = URL.createObjectURL(pdfBlob);
@@ -2076,21 +2036,21 @@ function detectFiducialCornersInPhoto(rawCanvas) {
         return sum / count;
     }
 
-// 2. Binarizar píxeles significativamente más oscuros que su entorno local (tolera desenfoque y sombra)
+// 2. Binarizar píxeles oscuros con margen para sombras y desenfoque de cámara
     const binary = new Uint8Array(W * H);
-    const winR = Math.max(18, Math.round(Math.min(W, H) * 0.045));
+    const winR = Math.max(20, Math.round(Math.min(W, H) * 0.05));
     for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
             const mean = getLocalMean(x, y, winR);
-            binary[y * W + x] = (gray[y * W + x] < mean * 0.78 && gray[y * W + x] < 170) ? 1 : 0;
+            binary[y * W + x] = (gray[y * W + x] < mean * 0.80 && gray[y * W + x] < 175) ? 1 : 0;
         }
     }
 
     // 3. Etiquetado de componentes conexos (Blobs) para hallar candidatos a cuadros fiduciales
     const visited = new Uint8Array(W * H);
     const candidates = [];
-    const minSide = Math.max(5, Math.round(Math.min(W, H) * 0.007));
-    const maxSide = Math.round(Math.min(W, H) * 0.11);
+    const minSide = Math.max(4, Math.round(Math.min(W, H) * 0.006));
+    const maxSide = Math.round(Math.min(W, H) * 0.12);
 
     const stackX = new Int32Array(W * H);
     const stackY = new Int32Array(W * H);
@@ -2144,11 +2104,11 @@ function detectFiducialCornersInPhoto(rawCanvas) {
             if (bw < minSide || bh < minSide || bw > maxSide || bh > maxSide) continue;
 
             const aspect = bw / bh;
-            if (aspect < 0.65 || aspect > 1.55) continue;
+            if (aspect < 0.50 || aspect > 2.0) continue;
 
             const bboxArea = bw * bh;
             const fillRatio = pixelCount / bboxArea;
-            if (fillRatio < 0.45) continue;
+            if (fillRatio < 0.42) continue;                 
 
             candidates.push({
                 cx: (minX + maxX) / 2,
@@ -2178,8 +2138,8 @@ function detectFiducialCornersInPhoto(rawCanvas) {
 
     // Si en la foto sale un pedazo de otra hoja a la derecha (como en tus capturas),
     // evitamos irnos al borde derecho extremo si hay una columna divisoria antes.
-    const tl = pickBestInQuadrant(c => c.cx < W * 0.45 && c.cy < H * 0.40, W * 0.08, H * 0.08);
-    const bl = pickBestInQuadrant(c => c.cx < W * 0.45 && c.cy > H * 0.60, W * 0.08, H * 0.92);
+    const tl = pickBestInQuadrant(c => c.cx < W * 0.52 && c.cy < H * 0.48, W * 0.10, H * 0.10);
+    const bl = pickBestInQuadrant(c => c.cx < W * 0.52 && c.cy > H * 0.52, W * 0.10, H * 0.90);
 
     // Para TR y BR buscamos que estén alineados verticalmente entre sí y formen un rectángulo coherente con TL y BL
     const trCandidates = candidates.filter(c => c.cx > W * 0.45 && c.cy < H * 0.40);
@@ -2421,8 +2381,10 @@ async function processRawPhotoThroughHomography(rawCanvas) {
     extractStudentNameStripFromAlignedCanvas();
 }
 
+
 let isEditingManualCorners = false;
 let draggingCornerKey = null;
+let lastPointerCanvasPt = null;
 
 function toggleManualCornerEditor() {
     if (!appState.scanner.rawPhotoCanvas) return;
@@ -2433,16 +2395,57 @@ function toggleManualCornerEditor() {
     if (btnApply) btnApply.classList.toggle('hidden', !isEditingManualCorners);
     if (btnEdit) {
         btnEdit.textContent = isEditingManualCorners
-            ? t('btnCancelCorners')
-            : t('btnEditCorners');
+            ? (appState.lang === 'en' ? 'Cancel' : 'Cancelar')
+            : (appState.lang === 'en' ? 'Adjust 4 Corners' : 'Ajustar 4 Esquinas');
     }
 
     if (isEditingManualCorners) {
         initManualCornerCanvasEvents();
         renderManualCornerEditorCanvas();
     } else {
+        lastPointerCanvasPt = null;
         runOMRPixelAnalysis();
     }
+}
+
+function drawCornerLoupe(ctx, rawCanvas, focusPt, canvasW, canvasH) {
+    if (!focusPt) return;
+    const loupeR = Math.max(48, Math.round(canvasW * 0.095));
+    const zoom = 2.5;
+    const srcSpan = (loupeR * 2) / zoom;
+
+    const margin = loupeR + 12;
+    let lx = focusPt.x < canvasW * 0.5 ? canvasW - margin : margin;
+    let ly = focusPt.y < canvasH * 0.35 ? canvasH - margin : margin;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(lx, ly, loupeR, 0, Math.PI * 2);
+    ctx.fillStyle = '#0f172a';
+    ctx.fill();
+    ctx.clip();
+
+    const sx = focusPt.x - srcSpan / 2;
+    const sy = focusPt.y - srcSpan / 2;
+    ctx.drawImage(rawCanvas, sx, sy, srcSpan, srcSpan, lx - loupeR, ly - loupeR, loupeR * 2, loupeR * 2);
+
+    // Mira central en la lupa para ubicar el cuadro negro exacto
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(lx - 14, ly);
+    ctx.lineTo(lx + 14, ly);
+    ctx.moveTo(lx, ly - 14);
+    ctx.lineTo(lx, ly + 14);
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.beginPath();
+    ctx.arc(lx, ly, loupeR, 0, Math.PI * 2);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
 }
 
 function renderManualCornerEditorCanvas() {
@@ -2456,9 +2459,8 @@ function renderManualCornerEditorCanvas() {
     const ctx = canvas.getContext('2d');
     ctx.drawImage(raw, 0, 0);
 
-    // Sombreado sutil fuera del polígono seleccionado
     ctx.save();
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.38)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
     ctx.beginPath();
     ctx.rect(0, 0, canvas.width, canvas.height);
     ctx.moveTo(corners.tl.x, corners.tl.y);
@@ -2469,9 +2471,8 @@ function renderManualCornerEditorCanvas() {
     ctx.fill('evenodd');
     ctx.restore();
 
-    // Líneas conectoras del cuadrilátero
     ctx.strokeStyle = '#10b981';
-    ctx.lineWidth = Math.max(3, Math.round(canvas.width * 0.005));
+    ctx.lineWidth = Math.max(3, Math.round(canvas.width * 0.004));
     ctx.beginPath();
     ctx.moveTo(corners.tl.x, corners.tl.y);
     ctx.lineTo(corners.tr.x, corners.tr.y);
@@ -2480,8 +2481,7 @@ function renderManualCornerEditorCanvas() {
     ctx.closePath();
     ctx.stroke();
 
-    // Manejadores circulares en cada esquina (fáciles de tocar en móvil)
-    const handleR = Math.max(16, Math.round(canvas.width * 0.026));
+    const handleR = Math.max(14, Math.round(canvas.width * 0.022));
     ['tl', 'tr', 'bl', 'br'].forEach(key => {
         const pt = corners[key];
         ctx.beginPath();
@@ -2492,6 +2492,10 @@ function renderManualCornerEditorCanvas() {
         ctx.strokeStyle = '#ffffff';
         ctx.stroke();
     });
+
+    if (draggingCornerKey && lastPointerCanvasPt) {
+        drawCornerLoupe(ctx, raw, lastPointerCanvasPt, canvas.width, canvas.height);
+    }
 }
 
 function getCanvasPointerCoords(canvas, clientX, clientY) {
@@ -2512,7 +2516,7 @@ function initManualCornerCanvasEvents() {
         if (!isEditingManualCorners || !appState.scanner.fiducialCorners) return;
         const pt = getCanvasPointerCoords(canvas, clientX, clientY);
         const corners = appState.scanner.fiducialCorners;
-        const hitRadius = Math.max(36, canvas.width * 0.07);
+        const hitRadius = Math.max(40, canvas.width * 0.08);
 
         let closestKey = null;
         let minDist = Infinity;
@@ -2524,22 +2528,26 @@ function initManualCornerCanvasEvents() {
             }
         });
         draggingCornerKey = closestKey;
+        lastPointerCanvasPt = closestKey ? pt : null;
         if (draggingCornerKey) renderManualCornerEditorCanvas();
     };
 
     const onMove = (clientX, clientY) => {
         if (!isEditingManualCorners || !draggingCornerKey || !appState.scanner.fiducialCorners) return;
         const pt = getCanvasPointerCoords(canvas, clientX, clientY);
-        appState.scanner.fiducialCorners[draggingCornerKey] = {
+        const clamped = {
             x: Math.max(0, Math.min(canvas.width, pt.x)),
             y: Math.max(0, Math.min(canvas.height, pt.y))
         };
+        appState.scanner.fiducialCorners[draggingCornerKey] = clamped;
+        lastPointerCanvasPt = clamped;
         renderManualCornerEditorCanvas();
     };
 
     const onUp = () => {
         if (!draggingCornerKey) return;
         draggingCornerKey = null;
+        lastPointerCanvasPt = null;
         renderManualCornerEditorCanvas();
     };
 
@@ -2575,9 +2583,11 @@ function applyManualCornersAndRescan() {
     if (!raw || !corners || !ex) return;
 
     isEditingManualCorners = false;
+    draggingCornerKey = null;
+    lastPointerCanvasPt = null;
     document.getElementById('btnApplyManualCorners')?.classList.add('hidden');
     const btnEdit = document.getElementById('uiBtnEditCorners');
-    if (btnEdit) btnEdit.textContent = t('btnEditCorners');
+    if (btnEdit) btnEdit.textContent = appState.lang === 'en' ? 'Adjust 4 Corners' : 'Ajustar 4 Esquinas';
 
     const detectedW = Math.hypot(corners.tr.x - corners.tl.x, corners.tr.y - corners.tl.y);
     const detectedH = Math.hypot(corners.bl.x - corners.tl.x, corners.bl.y - corners.tl.y);
@@ -2842,17 +2852,23 @@ function extractStudentNameStripFromAlignedCanvas() {
     const H = src.height;
     const s = Math.min(W / 560, H / 720);
 
-    // Coordenadas exactas del renglón de Nombre según formato
-    const sx = Math.round(46 * s);
-    const sy = isMinimal ? Math.round(42 * s) : Math.round(92 * s);
-    const sw = isMinimal ? Math.round(350 * s) : Math.round(265 * s);
-    const sh = isMinimal ? Math.round(34 * s) : Math.round(46 * s);
+    const sx = Math.round(95 * s);
+    const sy = isMinimal ? Math.round(52 * s) : Math.round(108 * s);
+    const sw = isMinimal ? Math.round(250 * s) : Math.round(235 * s);
+    const sh = isMinimal ? Math.round(24 * s) : Math.round(28 * s);
 
     cropBox.classList.remove('hidden');
     const ctx = cropCanvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
-    ctx.drawImage(src, sx, sy, sw, sh, 0, 0, cropCanvas.width, cropCanvas.height);
+
+    const fitScale = Math.min(cropCanvas.width / sw, cropCanvas.height / sh);
+    const dw = Math.round(sw * fitScale);
+    const dh = Math.round(sh * fitScale);
+    const dx = Math.round((cropCanvas.width - dw) / 2);
+    const dy = Math.round((cropCanvas.height - dh) / 2);
+
+    ctx.drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
 async function runHandwritingOcrOnCrop() {
@@ -2867,6 +2883,18 @@ async function runHandwritingOcrOnCrop() {
 
     try {
         await loadScriptOnce('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js', 'Tesseract');
+        const cCtx = cropCanvas.getContext('2d');
+        const cImg = cCtx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
+        const cd = cImg.data;
+        for (let i = 0; i < cd.length; i += 4) {
+            const luma = 0.299 * cd[i] + 0.587 * cd[i + 1] + 0.114 * cd[i + 2];
+            const boosted = luma < 185 ? Math.max(0, (luma - 185) * 2.2 + 185) : 255;
+            const v = Math.max(0, Math.min(255, boosted));
+            cd[i] = v;
+            cd[i + 1] = v;
+            cd[i + 2] = v;
+        }
+        cCtx.putImageData(cImg, 0, 0);
         const { data: { text } } = await window.Tesseract.recognize(cropCanvas, 'spa');
         const cleaned = (text || '')
             .replace(/NOMBRE\s*(COMPLETO)?\s*(DEL)?\s*(ESTUDIANTE)?\s*[:.]?/gi, '')
