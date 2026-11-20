@@ -1788,10 +1788,29 @@ function startLiveFiducialLoop() {
 
     const workCanvas = document.createElement('canvas');
     const workCtx = workCanvas.getContext('2d', { willReadFrequently: true });
+    let holdStartTime = null;
+    let focusTriggeredForLock = false;
+
+    const triggerCameraAutofocus = () => {
+        if (!appState.scanner.stream) return;
+        const track = appState.scanner.stream.getVideoTracks()[0];
+        if (!track || typeof track.getCapabilities !== 'function' || typeof track.applyConstraints !== 'function') return;
+        try {
+            const caps = track.getCapabilities();
+            if (Array.isArray(caps.focusMode)) {
+                const mode = caps.focusMode.includes('continuous')
+                    ? 'continuous'
+                    : (caps.focusMode.includes('single-shot') ? 'single-shot' : null);
+                if (mode) {
+                    track.applyConstraints({ advanced: [{ focusMode: mode }] }).catch(() => {});
+                }
+            }
+        } catch (_) {}
+    };
 
     const step = (now) => {
         if (!appState.scanner.stream || isAutoCapturing) return;
-        if (now - lastLiveScanTime >= 220 && video.readyState >= video.HAVE_ENOUGH_DATA) {
+        if (now - lastLiveScanTime >= 160 && video.readyState >= video.HAVE_ENOUGH_DATA) {
             lastLiveScanTime = now;
             const scale = Math.min(1, 540 / Math.max(video.videoWidth, video.videoHeight));
             workCanvas.width = Math.max(1, Math.round(video.videoWidth * scale));
@@ -1807,27 +1826,44 @@ function startLiveFiducialLoop() {
                     : 0;
                 prevCornersCenter = { x: cx, y: cy };
 
-                if (moved < workCanvas.width * 0.04) {
-                    stableCornersFrames++;
-                } else {
-                    stableCornersFrames = 1;
+                if (!focusTriggeredForLock) {
+                    focusTriggeredForLock = true;
+                    triggerCameraAutofocus();
                 }
+
+                if (moved > workCanvas.width * 0.055) {
+                    holdStartTime = now;
+                } else if (!holdStartTime) {
+                    holdStartTime = now;
+                }
+
+                const elapsedMs = now - holdStartTime;
+                const remainingSec = Math.max(0.1, ((1500 - elapsedMs) / 1000)).toFixed(1);
 
                 guide?.classList.add('is-locked');
                 if (pill) {
-                    const pct = Math.min(100, stableCornersFrames * 35);
-                    pill.textContent = autoChk?.checked
-                        ? t('liveCornersDetectedPct')(pct)
-                        : t('liveCornersDetectedManual');
+                    if (autoChk?.checked) {
+                        pill.textContent = appState.lang === 'en'
+                            ? `Focusing & holding... ${remainingSec}s`
+                            : `Enfocando y estabilizando... ${remainingSec}s`;
+                    } else {
+                        pill.textContent = t('liveCornersDetectedManual');
+                    }
                 }
 
-                if (autoChk?.checked && stableCornersFrames >= 3) {
+                if (autoChk?.checked && elapsedMs >= 1500) {
                     isAutoCapturing = true;
+                    holdStartTime = null;
+                    focusTriggeredForLock = false;
+                    if (pill) {
+                        pill.textContent = appState.lang === 'en' ? 'Capturing sharp photo...' : 'Tomando foto...';
+                    }
                     captureFromVideoAndScan();
                     return;
                 }
             } else {
-                stableCornersFrames = 0;
+                holdStartTime = null;
+                focusTriggeredForLock = false;
                 prevCornersCenter = null;
                 guide?.classList.remove('is-locked');
                 if (pill) pill.textContent = t('liveSearchingCorners');
@@ -1908,7 +1944,12 @@ async function toggleCameraStream() {
 
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment', width: { ideal: 1400 }, height: { ideal: 1800 } }
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 1400 },
+                height: { ideal: 1800 },
+                focusMode: { ideal: 'continuous' }
+            }
         });
         appState.scanner.stream = stream;
         mountScannerViewportMode(shouldOpenCameraInModal());
