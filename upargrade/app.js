@@ -2021,8 +2021,7 @@ function handleSheetImageUpload(event) {
     const img = new Image();
     img.onload = () => {
         const rawCanvas = document.createElement('canvas');
-        // Mantener buena resolución sin exceder 1600px para velocidad instantánea
-        const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+        const scale = Math.min(1, 2000 / Math.max(img.width, img.height));
         rawCanvas.width = Math.round(img.width * scale);
         rawCanvas.height = Math.round(img.height * scale);
         rawCanvas.getContext('2d').drawImage(img, 0, 0, rawCanvas.width, rawCanvas.height);
@@ -2072,13 +2071,13 @@ function detectFiducialCornersInPhoto(rawCanvas) {
         return sum / count;
     }
 
-    // 2. Binarizar píxeles significativamente más oscuros que su entorno local
+// 2. Binarizar píxeles significativamente más oscuros que su entorno local (tolera desenfoque y sombra)
     const binary = new Uint8Array(W * H);
-    const winR = Math.max(16, Math.round(Math.min(W, H) * 0.04));
+    const winR = Math.max(18, Math.round(Math.min(W, H) * 0.045));
     for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
             const mean = getLocalMean(x, y, winR);
-            binary[y * W + x] = (gray[y * W + x] < mean * 0.72 && gray[y * W + x] < 155) ? 1 : 0;
+            binary[y * W + x] = (gray[y * W + x] < mean * 0.78 && gray[y * W + x] < 170) ? 1 : 0;
         }
     }
 
@@ -2086,7 +2085,7 @@ function detectFiducialCornersInPhoto(rawCanvas) {
     const visited = new Uint8Array(W * H);
     const candidates = [];
     const minSide = Math.max(5, Math.round(Math.min(W, H) * 0.007));
-    const maxSide = Math.round(Math.min(W, H) * 0.085);
+    const maxSide = Math.round(Math.min(W, H) * 0.11);
 
     const stackX = new Int32Array(W * H);
     const stackY = new Int32Array(W * H);
@@ -2140,12 +2139,11 @@ function detectFiducialCornersInPhoto(rawCanvas) {
             if (bw < minSide || bh < minSide || bw > maxSide || bh > maxSide) continue;
 
             const aspect = bw / bh;
-            if (aspect < 0.55 || aspect > 1.8) continue;
+            if (aspect < 0.65 || aspect > 1.55) continue;
 
             const bboxArea = bw * bh;
             const fillRatio = pixelCount / bboxArea;
-            // Un cuadro fiducial negro sólido tiene un fillRatio alto (> 0.52)
-            if (fillRatio < 0.50) continue;
+            if (fillRatio < 0.45) continue;
 
             candidates.push({
                 cx: (minX + maxX) / 2,
@@ -2319,6 +2317,22 @@ function measureSheetFormatConfidence(warpedCanvas, ex, isMinimal) {
     return ringSamples > 0 ? (ringDarknessSum / ringSamples) : 0;
 }
 
+function enhanceSheetContrast(canvas) {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = imgData.data;
+    const contrast = 1.22; // leve aumento de contraste para aclarar papel gris y oscurecer tinta/lápiz
+    const intercept = 128 * (1 - contrast);
+
+    for (let i = 0; i < d.length; i += 4) {
+        d[i] = Math.max(0, Math.min(255, d[i] * contrast + intercept));
+        d[i + 1] = Math.max(0, Math.min(255, d[i + 1] * contrast + intercept));
+        d[i + 2] = Math.max(0, Math.min(255, d[i + 2] * contrast + intercept));
+    }
+    ctx.putImageData(imgData, 0, 0);
+}
+
 /**
  * Procesa cualquier foto subida o capturada:
  * 1) Detecta las 4 esquinas negras.
@@ -2380,6 +2394,9 @@ async function processRawPhotoThroughHomography(rawCanvas) {
     // Probar ambos formatos (Completo vs Simplificado) y elegir automáticamente el que mejor calza con los círculos impresos
     const warpedFull = warpSheetPerspectiveToCanonical(rawCanvas, corners, destW, destH, false);
     const warpedMin = warpSheetPerspectiveToCanonical(rawCanvas, corners, destW, destH, true);
+
+    enhanceSheetContrast(warpedFull);
+    enhanceSheetContrast(warpedMin);
 
     const scoreFull = measureSheetFormatConfidence(warpedFull, matchedExam, false);
     const scoreMin = measureSheetFormatConfidence(warpedMin, matchedExam, true);

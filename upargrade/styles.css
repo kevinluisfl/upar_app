@@ -931,13 +931,16 @@ input:focus, select:focus {
     position: relative;
     width: 100%;
     max-width: 460px;
-    aspect-ratio: 3 / 4;
-    max-height: 68vh;
     margin: 0 auto;
     background: #0f172a;
     border-radius: 1rem;
     overflow: hidden;
     border: 2px solid var(--border);
+}
+
+.scanner-viewport-wrapper:has(.scanner-video:not(.hidden)) {
+    aspect-ratio: 3 / 4;
+    max-height: 68vh;
 }
 
 .scanner-viewport-wrapper.is-landscape {
@@ -1147,7 +1150,8 @@ input:focus, select:focus {
 
 .camera-modal-host .scanner-viewport-wrapper {
     width: 100%;
-    max-height: 62vh;
+    max-height: 75vh;
+    overflow-y: auto;
 }
 
 /* ==========================================================================
