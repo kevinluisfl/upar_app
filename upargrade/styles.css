@@ -1116,10 +1116,17 @@ input:focus, select:focus {
     justify-content: center;
 }
 
-.camera-modal-host .scanner-viewport-wrapper {
+/* .camera-modal-host .scanner-viewport-wrapper {
     width: 100%;
     max-height: 75vh;
     overflow-y: auto;
+} */
+
+.scanner-viewport-wrapper.is-landscape,
+.camera-modal-host .scanner-viewport-wrapper.is-landscape {
+    max-width: 100% !important;
+    aspect-ratio: 4 / 3 !important;
+    max-height: 62vh !important;
 }
 
 /* ==========================================================================

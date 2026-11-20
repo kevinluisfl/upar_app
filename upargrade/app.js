@@ -1928,6 +1928,11 @@ function toggleScannerViewportOrientation() {
     if (wrapper) wrapper.classList.toggle('is-landscape', isLand);
     if (lbl) lbl.textContent = text;
     if (modalLbl) modalLbl.textContent = text;
+
+    if (appState.scanner.stream) {
+        stableCornersFrames = 0;
+        prevCornersCenter = null;
+    }
 }
 
 async function toggleCameraStream() {
@@ -1988,16 +1993,52 @@ function stopCameraStream() {
     if (btnCam) btnCam.textContent = t('btnCameraOn');
 }
 
+// function captureFromVideoAndScan() {
+//     const video = document.getElementById('scannerVideo');
+//     if (!video || !video.videoWidth || !video.videoHeight) return;
+
+//     const vw = video.videoWidth;
+//     const vh = video.videoHeight;
+//     const targetAspect = scannerViewportOrientation === 'landscape' ? (4 / 3) : (3 / 4);
+//     const srcAspect = vw / vh;
+
+//     let sx = 0, sy = 0, sw = vw, sh = vh;
+//     if (srcAspect > targetAspect) {
+//         sw = Math.round(vh * targetAspect);
+//         sx = Math.round((vw - sw) / 2);
+//     } else if (srcAspect < targetAspect) {
+//         sh = Math.round(vw / targetAspect);
+//         sy = Math.round((vh - sh) / 2);
+//     }
+
+//     const outW = Math.min(1200, sw);
+//     const outH = Math.round(outW / targetAspect);
+
+//     const rawCanvas = document.createElement('canvas');
+//     rawCanvas.width = outW;
+//     rawCanvas.height = outH;
+//     rawCanvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, outW, outH);
+
+//     stopCameraStream();
+//     processRawPhotoThroughHomography(rawCanvas);
+//     showToast(t('toastScanComplete'), 'fa-camera');
+// }
+
 function captureFromVideoAndScan() {
     const video = document.getElementById('scannerVideo');
     if (!video || !video.videoWidth || !video.videoHeight) return;
 
     const vw = video.videoWidth;
     const vh = video.videoHeight;
-    const targetAspect = scannerViewportOrientation === 'landscape' ? (4 / 3) : (3 / 4);
+    const isLandscapeFrame = scannerViewportOrientation === 'landscape';
+    const targetAspect = isLandscapeFrame ? (4 / 3) : (3 / 4);
     const srcAspect = vw / vh;
 
-    let sx = 0, sy = 0, sw = vw, sh = vh;
+    let sx = 0;
+    let sy = 0;
+    let sw = vw;
+    let sh = vh;
+
     if (srcAspect > targetAspect) {
         sw = Math.round(vh * targetAspect);
         sx = Math.round((vw - sw) / 2);
@@ -2006,18 +2047,28 @@ function captureFromVideoAndScan() {
         sy = Math.round((vh - sh) / 2);
     }
 
-    const outW = Math.min(1200, sw);
-    const outH = Math.round(outW / targetAspect);
+    const maxLongSide = 1280;
+    let outW;
+    let outH;
+    if (isLandscapeFrame) {
+        outW = Math.min(maxLongSide, sw);
+        outH = Math.round(outW / targetAspect);
+    } else {
+        outH = Math.min(maxLongSide, sh);
+        outW = Math.round(outH * targetAspect);
+    }
 
     const rawCanvas = document.createElement('canvas');
-    rawCanvas.width = outW;
-    rawCanvas.height = outH;
-    rawCanvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, outW, outH);
+    rawCanvas.width = Math.max(1, outW);
+    rawCanvas.height = Math.max(1, outH);
+    rawCanvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, rawCanvas.width, rawCanvas.height);
 
     stopCameraStream();
     processRawPhotoThroughHomography(rawCanvas);
     showToast(t('toastScanComplete'), 'fa-camera');
 }
+
+// 
 
 function handleSheetImageUpload(event) {
     const file = event.target.files[0];
