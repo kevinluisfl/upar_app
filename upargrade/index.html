@@ -351,6 +351,13 @@
                         </label>
                         <input type="range" id="omrThresholdRange" min="18" max="65" value="38" oninput="updateSensitivityLabel(this.value)" onchange="rescanCurrentCanvasImage()">
                         <div class="scanner-frame-adjust-row">
+                            <label for="omrBubbleWidthRange" style="margin:0;">
+                                <span id="uiLabelBubbleWidth">Anchura de burbujas (hojas compactas):</span>
+                                <strong id="bubbleWidthValueLabel" class="font-mono">100%</strong>
+                            </label>
+                            <input type="range" id="omrBubbleWidthRange" min="75" max="115" value="100" style="width:150px;" oninput="updateBubbleWidthScale(this.value)">
+                        </div>
+                        <div class="scanner-frame-adjust-row">
                             <span id="uiCornerDragHint">¿Esquinas desfasadas? Arrástralas en la foto:</span>
                             <div class="scanner-frame-adjust-btns">
                                 <button type="button" id="btnToggleCornerEditor" class="btn-mini" onclick="toggleManualCornerEditor()">

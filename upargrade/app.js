@@ -84,6 +84,7 @@ const I18N = {
         btnUploadPhoto: 'Subir Foto de Hoja',
         btnSimulateScan: 'Simular Hoja Llena',
         labelSensitivity: 'Sensibilidad de detección de lápiz/tinta:',
+        labelBubbleWidth: 'Anchura de burbujas (hojas compactas):',
         scanResultTitle: 'Resultado de la Evaluación',
         scanStatusReady: 'Listo para escanear',
         statCorrect: 'Correctas',
@@ -224,6 +225,7 @@ const I18N = {
         btnUploadPhoto: 'Upload Sheet Photo',
         btnSimulateScan: 'Simulate Filled Sheet',
         labelSensitivity: 'Pencil / Ink detection sensitivity:',
+        labelBubbleWidth: 'Bubble width (compact sheets):',
         scanResultTitle: 'Assessment Result',
         scanStatusReady: 'Ready to scan',
         statCorrect: 'Correct',
@@ -312,6 +314,7 @@ let appState = {
     scanner: {
         stream: null,
         threshold: 38,
+        bubbleWidthScale: 100,
         lastImageSource: null,
         detectedAnswers: {}
     }
@@ -1174,12 +1177,14 @@ function getOMRBubbleGeometry(ex, width = 700, height = 920, isMinimal = false) 
     const availH = Math.max(100, height - startY - bottomPad);
     const rowHeight = availH / perCol;
 
-    const labelOffset = Math.round((isMinimal ? 32 : 44) * s);
+    const widthFactor = (Number(appState?.scanner?.bubbleWidthScale) || 100) / 100;
+    const labelOffset = Math.round((isMinimal ? 32 : 44) * s * Math.min(1.15, Math.max(0.75, widthFactor)));
     const bubbleAreaW = Math.max(40, colWidth - labelOffset - Math.round(8 * s));
-    const bubbleSpacing = Math.min(
+    const baseSpacing = Math.min(
         Math.round((isMinimal ? 34 : 38) * s),
         bubbleAreaW / activeLetters.length
     );
+    const bubbleSpacing = baseSpacing * widthFactor;
 
     const bubbleRadius = Math.max(
         5,
@@ -2607,6 +2612,15 @@ function updateSensitivityLabel(val) {
     document.getElementById('sensitivityValueLabel').textContent = `${appState.scanner.threshold}%`;
 }
 
+function updateBubbleWidthScale(val) {
+    appState.scanner.bubbleWidthScale = parseInt(val, 10) || 100;
+    const lbl = document.getElementById('bubbleWidthValueLabel');
+    if (lbl) lbl.textContent = `${appState.scanner.bubbleWidthScale}%`;
+    if (appState.scanner.lastImageSource) {
+        runOMRPixelAnalysis();
+    }
+}
+
 function rescanCurrentCanvasImage() {
     if (!appState.scanner.lastImageSource) return;
     runOMRPixelAnalysis();
@@ -4025,6 +4039,7 @@ function applyTranslations() {
     setText('uiBtnUploadPhoto', t('btnUploadPhoto'));
     setText('uiBtnSimulateScan', t('btnSimulateScan'));
     setText('uiLabelSensitivity', t('labelSensitivity'));
+    setText('uiLabelBubbleWidth', t('labelBubbleWidth'));
     setText('uiScanResultTitle', t('scanResultTitle'));
     setText('scanStatusBadge', t('scanStatusReady'));
     setText('uiStatCorrect', t('statCorrect'));
@@ -4131,7 +4146,8 @@ Object.assign(window, {
     onSavedExamsSearch,
     goToSavedExamsPage,
     toggleManualCornerEditor,
-    applyManualCornersAndRescan
+    applyManualCornersAndRescan,
+    updateBubbleWidthScale
 });
 
 window.addEventListener('DOMContentLoaded', () => {
