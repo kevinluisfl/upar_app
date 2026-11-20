@@ -1159,6 +1159,63 @@ async function checkIncomingSuiteQrParams() {
     }, 300);
 }
 
+
+function enableDropZone(dropZoneEl, fileInputEl, onFileDropped) {
+    if (!dropZoneEl || !fileInputEl || typeof onFileDropped !== 'function') return;
+    if (dropZoneEl.dataset.dropBound === '1') return;
+    dropZoneEl.dataset.dropBound = '1';
+
+    const preventDefaults = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    ['dragenter', 'dragover'].forEach(evtName => {
+        dropZoneEl.addEventListener(evtName, (e) => {
+            preventDefaults(e);
+            dropZoneEl.classList.add('is-drag-over');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(evtName => {
+        dropZoneEl.addEventListener(evtName, (e) => {
+            preventDefaults(e);
+            if (evtName === 'dragleave' && dropZoneEl.contains(e.relatedTarget)) return;
+            dropZoneEl.classList.remove('is-drag-over');
+        });
+    });
+
+    dropZoneEl.addEventListener('drop', (e) => {
+        const files = e.dataTransfer?.files;
+        if (!files || !files.length) return;
+        onFileDropped(files[0]);
+    });
+}
+
+
+function createFileListFromSingleFile(file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    return dt.files;
+}
+
+function initSuiteWelcomeDropZone() {
+    const welcomeCard = document.querySelector('.hero-banner');
+    const importInput = document.getElementById('masterImportInput');
+    if (!welcomeCard || !importInput) return;
+
+    enableDropZone(welcomeCard, importInput, (file) => {
+        if (typeof handleMasterImportJSON === 'function') {
+            handleMasterImportJSON({ target: { files: [file], value: '' } });
+        } else {
+            importInput.files = createFileListFromSingleFile(file);
+            importInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
     checkIncomingSuiteQrParams();
+    initSuiteWelcomeDropZone();
 });
+

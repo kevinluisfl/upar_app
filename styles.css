@@ -1062,3 +1062,10 @@ body {
     font-size: 0.72rem;
     opacity: 0.8;
 }
+
+.is-drag-over {
+    outline: 2px dashed var(--accent-light);
+    outline-offset: -2px;
+    background: var(--accent-soft) !important;
+    transition: background 0.15s ease, outline-color 0.15s ease;
+}
