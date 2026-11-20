@@ -114,7 +114,8 @@ const I18N = {
         toastAllActivitiesCleared: "Todas las actividades guardadas fueron eliminadas",
         toastExportSuccess: "Archivo JSON exportado correctamente",
         toastImportSuccess: "Actividades importadas con éxito",
-        toastImportError: "El archivo JSON no tiene un formato válido."
+        toastImportError: "El archivo JSON no tiene un formato válido.",
+        toastImportInvalidPuzzle: "El archivo no contiene actividades válidas para UparPuzzle."
     },
     en: {
         badgeInteractive: "Interactive",
@@ -228,7 +229,8 @@ const I18N = {
         toastAllActivitiesCleared: "All saved activities were deleted",
         toastExportSuccess: "JSON file exported successfully",
         toastImportSuccess: "Activities imported successfully",
-        toastImportError: "The JSON file does not have a valid format."
+        toastImportError: "The JSON file does not have a valid format.",
+        toastImportInvalidPuzzle: "The file does not contain valid activities for UparPuzzle."
     }
 };
 
@@ -1426,6 +1428,28 @@ function triggerImportJSON() {
     document.getElementById('importJsonInput').click();
 }
 
+function isValidPuzzleActivity(act) {
+    if (!act || typeof act !== 'object') return false;
+    if (!Array.isArray(act.items) || act.items.length === 0) return false;
+
+    const hasValidWord = act.items.some(it =>
+        it && typeof it === 'object' && typeof it.word === 'string' && sanitizeWord(it.word).length >= 2
+    );
+    if (!hasValidWord) return false;
+
+    // Evita aceptar estructuras de otras apps que por casualidad tengan un arreglo "items"
+    const isPuzzleShape =
+        act.mode === 'wordsearch' ||
+        act.mode === 'crossword' ||
+        Boolean(act.wsLayout) ||
+        Boolean(act.cwLayout) ||
+        Boolean(act.settings) ||
+        typeof act.title === 'string' ||
+        typeof act.name === 'string';
+
+    return isPuzzleShape;
+}
+
 function handleImportJSON(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -1435,55 +1459,64 @@ function handleImportJSON(event) {
         try {
             const data = JSON.parse(e.target.result);
             let existing = getSavedActivities();
+            const validImported = [];
             let importedToLoad = null;
 
+            const pushValid = (act) => {
+                if (!isValidPuzzleActivity(act)) return;
+                const normalizedItems = act.items
+                    .map((it, idx) => {
+                        const cleanWord = sanitizeWord(it.word);
+                        if (cleanWord.length < 2) return null;
+                        return {
+                            id: it.id || ('item_' + Date.now() + '_' + idx),
+                            word: cleanWord,
+                            clue: (typeof it.clue === 'string' && it.clue.trim())
+                                ? it.clue.trim()
+                                : `${t('defaultCluePrefix')} ${cleanWord}`
+                        };
+                    })
+                    .filter(Boolean);
+
+                if (normalizedItems.length === 0) return;
+
+                const cleanName = String(act.name || act.title || t('untitledPuzzle')).trim() || t('untitledPuzzle');
+                const cleanTitle = String(act.title || act.name || cleanName).trim() || cleanName;
+                const normalizedAct = {
+                    ...act,
+                    id: act.id || ('act_' + Date.now() + '_' + Math.floor(Math.random() * 1000)),
+                    name: cleanName,
+                    title: cleanTitle,
+                    createdAt: act.createdAt || new Date().toISOString(),
+                    mode: act.mode === 'crossword' ? 'crossword' : 'wordsearch',
+                    items: normalizedItems
+                };
+                validImported.push(normalizedAct);
+            };
+
             if (Array.isArray(data)) {
-                data.forEach(act => {
-                    if (act && act.name && Array.isArray(act.items)) {
-                        existing = existing.filter(x => x.name.toLowerCase() !== act.name.toLowerCase());
-                        existing.unshift(act);
-                        if (!importedToLoad) importedToLoad = act;
-                    }
-                });
+                data.forEach(pushValid);
             } else if (data && typeof data === 'object') {
                 if (Array.isArray(data.savedActivities)) {
-                    data.savedActivities.forEach(act => {
-                        if (act && act.name && Array.isArray(act.items)) {
-                            existing = existing.filter(x => x.name.toLowerCase() !== act.name.toLowerCase());
-                            existing.push(act);
-                            if (!importedToLoad) importedToLoad = act;
-                        }
-                    });
+                    data.savedActivities.forEach(pushValid);
                 }
-                if (data.currentActivity && Array.isArray(data.currentActivity.items)) {
-                    const curr = data.currentActivity;
-                    const alreadyInSaved = existing.some(x => x.name.toLowerCase() === (curr.name || '').toLowerCase());
-                    if (!alreadyInSaved) {
-                        existing.unshift(curr);
-                    }
-                    importedToLoad = curr;
-                } else if (data.items && Array.isArray(data.items)) {
-                    const singleAct = {
-                        id: data.id || 'act_' + Date.now(),
-                        name: data.name || data.title || 'Actividad Importada',
-                        title: data.title || data.name || 'Actividad Importada',
-                        createdAt: data.createdAt || new Date().toISOString(),
-                        mode: data.mode || 'wordsearch',
-                        items: data.items,
-                        settings: data.settings,
-                        wsLayout: data.wsLayout,
-                        cwLayout: data.cwLayout
-                    };
-                    existing = existing.filter(x => x.name.toLowerCase() !== singleAct.name.toLowerCase());
-                    existing.unshift(singleAct);
-                    importedToLoad = singleAct;
+                if (data.currentActivity) {
+                    pushValid(data.currentActivity);
+                } else if (Array.isArray(data.items)) {
+                    pushValid(data);
                 }
             }
 
-            if (!importedToLoad && existing.length === 0) {
-                showToast(t('toastImportError'), 'error');
+            if (validImported.length === 0) {
+                showToast(t('toastImportInvalidPuzzle'), 'warning');
                 return;
             }
+
+            validImported.forEach(act => {
+                existing = existing.filter(x => (x.name || '').toLowerCase() !== act.name.toLowerCase());
+                existing.unshift(act);
+            });
+            importedToLoad = validImported[0];
 
             savedPagination.currentPage = 1;
             setSavedActivities(existing);
@@ -3393,6 +3426,55 @@ async function checkIncomingPuzzleQrParams() {
     }, 350);
 }
 
+function enableDropZone(dropZoneEl, fileInputEl, onFileDropped) {
+    if (!dropZoneEl || !fileInputEl || typeof onFileDropped !== 'function') return;
+    if (dropZoneEl.dataset.dropBound === '1') return;
+    dropZoneEl.dataset.dropBound = '1';
+
+    const preventDefaults = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    ['dragenter', 'dragover'].forEach(evtName => {
+        dropZoneEl.addEventListener(evtName, (e) => {
+            preventDefaults(e);
+            dropZoneEl.classList.add('is-drag-over');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(evtName => {
+        dropZoneEl.addEventListener(evtName, (e) => {
+            preventDefaults(e);
+            if (evtName === 'dragleave' && dropZoneEl.contains(e.relatedTarget)) return;
+            dropZoneEl.classList.remove('is-drag-over');
+        });
+    });
+
+    dropZoneEl.addEventListener('drop', (e) => {
+        const files = e.dataTransfer?.files;
+        if (!files || !files.length) return;
+        onFileDropped(files[0]);
+    });
+}
+
+function initPuzzleSavedDropZone() {
+    const fileInput = document.getElementById('importJsonInput');
+    const dropZone = document.getElementById('savedActivitiesList')?.parentElement || fileInput?.parentElement;
+    if (!dropZone || !fileInput) return;
+
+    enableDropZone(dropZone, fileInput, (file) => {
+        if (typeof handleImportJSON === 'function') {
+            handleImportJSON({ target: { files: [file], value: '' } });
+        } else {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;
+            fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+}
+
 /* =========================================================================
    9. INICIALIZACIÓN AL CARGAR LA PÁGINA
    ========================================================================= */
@@ -3401,6 +3483,7 @@ window.onload = function () {
     initWordSearchTouchEvents();
     initMobileCrosswordKeyboard();
     checkIncomingPuzzleQrParams();
+    initPuzzleSavedDropZone();
     setTimeout(() => {
         loadPreset('astronomia');
         applyTranslations();
