@@ -4176,6 +4176,48 @@ function applyTranslations() {
     }
 }
 
+function enableDropZone(dropZoneEl, fileInputEl, onFileDropped) {
+    if (!dropZoneEl || !fileInputEl || typeof onFileDropped !== 'function') return;
+    if (dropZoneEl.dataset.dropBound === '1') return;
+    dropZoneEl.dataset.dropBound = '1';
+
+    const preventDefaults = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    ['dragenter', 'dragover'].forEach(evtName => {
+        dropZoneEl.addEventListener(evtName, (e) => {
+            preventDefaults(e);
+            dropZoneEl.classList.add('is-drag-over');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(evtName => {
+        dropZoneEl.addEventListener(evtName, (e) => {
+            preventDefaults(e);
+            if (evtName === 'dragleave' && dropZoneEl.contains(e.relatedTarget)) return;
+            dropZoneEl.classList.remove('is-drag-over');
+        });
+    });
+
+    dropZoneEl.addEventListener('drop', (e) => {
+        const files = e.dataTransfer?.files;
+        if (!files || !files.length) return;
+        onFileDropped(files[0]);
+    });
+}
+
+function initGradebookDropZone() {
+    const dropZone = document.querySelector('#viewExams .saved-exams-box');
+    const fileInput = document.getElementById('importJsonFile');
+    if (!dropZone || !fileInput) return;
+
+    enableDropZone(dropZone, fileInput, (file) => {
+        handleImportJSON({ target: { files: [file], value: '' } });
+    });
+}
+
 /* Exposición global explícita */
 Object.assign(window, {
     switchView,
@@ -4230,6 +4272,7 @@ window.addEventListener('DOMContentLoaded', () => {
     applyTranslations();
     drawReferenceSheetOnScannerCanvas(true);
     checkIncomingQrUrlParam();
+    initGradebookDropZone();
 
     document.getElementById('btnThemeToggle').addEventListener('click', () => {
         appState.theme = appState.theme === 'dark' ? 'light' : 'dark';
