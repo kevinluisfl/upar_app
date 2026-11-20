@@ -911,6 +911,22 @@ input:focus, select:focus {
     font-size: 0.76rem;
 }
 
+.scanner-frame-adjust-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-top: 0.35rem;
+    border-top: 1px dashed var(--border);
+    flex-wrap: wrap;
+}
+
+.scanner-frame-adjust-btns {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
 .scanner-viewport-wrapper {
     position: relative;
     width: 100%;

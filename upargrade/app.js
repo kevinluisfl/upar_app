@@ -152,7 +152,11 @@ const I18N = {
         liveCornersDetectedPct: (pct) => `4 esquinas detectadas (${pct}%)...`,
         liveCornersDetectedManual: '4 esquinas detectadas — pulsa Capturar',
         liveSheetMinimalOk: 'Hoja Simplificada detectada (4 esquinas OK)',
-        liveSheetFullOk: 'Hoja Completa ICFES detectada (4 esquinas OK)'
+        liveSheetFullOk: 'Hoja Completa ICFES detectada (4 esquinas OK)',
+        cornerDragHint: '¿Esquinas desfasadas? Arrástralas en la foto:',
+        btnEditCorners: 'Ajustar 4 Esquinas',
+        btnCancelCorners: 'Cancelar',
+        btnApplyCorners: 'Aplicar'
     },
     en: {
         mainSubtitle: 'OMR answer sheet generator and automated optical grading',
@@ -289,6 +293,10 @@ const I18N = {
         liveCornersDetectedManual: '4 corners detected — tap Capture',
         liveSheetMinimalOk: 'Simplified Sheet detected (4 corners OK)',
         liveSheetFullOk: 'Full ICFES Sheet detected (4 corners OK)',
+        cornerDragHint: 'Corners off? Drag them on the photo:',
+        btnEditCorners: 'Adjust 4 Corners',
+        btnCancelCorners: 'Cancel',
+        btnApplyCorners: 'Apply'
     }
 };
 
@@ -2077,7 +2085,7 @@ function detectFiducialCornersInPhoto(rawCanvas) {
     // 3. Etiquetado de componentes conexos (Blobs) para hallar candidatos a cuadros fiduciales
     const visited = new Uint8Array(W * H);
     const candidates = [];
-    const minSide = Math.max(6, Math.round(Math.min(W, H) * 0.010));
+    const minSide = Math.max(5, Math.round(Math.min(W, H) * 0.007));
     const maxSide = Math.round(Math.min(W, H) * 0.085);
 
     const stackX = new Int32Array(W * H);
@@ -2389,6 +2397,192 @@ async function processRawPhotoThroughHomography(rawCanvas) {
 
     runOMRPixelAnalysis();
     extractStudentNameStripFromAlignedCanvas();
+}
+
+let isEditingManualCorners = false;
+let draggingCornerKey = null;
+
+function toggleManualCornerEditor() {
+    if (!appState.scanner.rawPhotoCanvas) return;
+    isEditingManualCorners = !isEditingManualCorners;
+
+    const btnApply = document.getElementById('btnApplyManualCorners');
+    const btnEdit = document.getElementById('uiBtnEditCorners');
+    if (btnApply) btnApply.classList.toggle('hidden', !isEditingManualCorners);
+    if (btnEdit) {
+        btnEdit.textContent = isEditingManualCorners
+            ? t('btnCancelCorners')
+            : t('btnEditCorners');
+    }
+
+    if (isEditingManualCorners) {
+        initManualCornerCanvasEvents();
+        renderManualCornerEditorCanvas();
+    } else {
+        runOMRPixelAnalysis();
+    }
+}
+
+function renderManualCornerEditorCanvas() {
+    const canvas = document.getElementById('omrScannerCanvas');
+    const raw = appState.scanner.rawPhotoCanvas;
+    const corners = appState.scanner.fiducialCorners;
+    if (!canvas || !raw || !corners) return;
+
+    canvas.width = raw.width;
+    canvas.height = raw.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(raw, 0, 0);
+
+    // Sombreado sutil fuera del polígono seleccionado
+    ctx.save();
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.38)';
+    ctx.beginPath();
+    ctx.rect(0, 0, canvas.width, canvas.height);
+    ctx.moveTo(corners.tl.x, corners.tl.y);
+    ctx.lineTo(corners.bl.x, corners.bl.y);
+    ctx.lineTo(corners.br.x, corners.br.y);
+    ctx.lineTo(corners.tr.x, corners.tr.y);
+    ctx.closePath();
+    ctx.fill('evenodd');
+    ctx.restore();
+
+    // Líneas conectoras del cuadrilátero
+    ctx.strokeStyle = '#10b981';
+    ctx.lineWidth = Math.max(3, Math.round(canvas.width * 0.005));
+    ctx.beginPath();
+    ctx.moveTo(corners.tl.x, corners.tl.y);
+    ctx.lineTo(corners.tr.x, corners.tr.y);
+    ctx.lineTo(corners.br.x, corners.br.y);
+    ctx.lineTo(corners.bl.x, corners.bl.y);
+    ctx.closePath();
+    ctx.stroke();
+
+    // Manejadores circulares en cada esquina (fáciles de tocar en móvil)
+    const handleR = Math.max(16, Math.round(canvas.width * 0.026));
+    ['tl', 'tr', 'bl', 'br'].forEach(key => {
+        const pt = corners[key];
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, handleR, 0, Math.PI * 2);
+        ctx.fillStyle = draggingCornerKey === key ? '#f59e0b' : '#10b981';
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+    });
+}
+
+function getCanvasPointerCoords(canvas, clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: ((clientX - rect.left) / rect.width) * canvas.width,
+        y: ((clientY - rect.top) / rect.height) * canvas.height
+    };
+}
+
+function initManualCornerCanvasEvents() {
+    const canvas = document.getElementById('omrScannerCanvas');
+    if (!canvas || canvas.dataset.cornerEventsBound === '1') return;
+    canvas.dataset.cornerEventsBound = '1';
+    canvas.style.touchAction = 'none';
+
+    const onDown = (clientX, clientY) => {
+        if (!isEditingManualCorners || !appState.scanner.fiducialCorners) return;
+        const pt = getCanvasPointerCoords(canvas, clientX, clientY);
+        const corners = appState.scanner.fiducialCorners;
+        const hitRadius = Math.max(36, canvas.width * 0.07);
+
+        let closestKey = null;
+        let minDist = Infinity;
+        ['tl', 'tr', 'bl', 'br'].forEach(k => {
+            const d = Math.hypot(corners[k].x - pt.x, corners[k].y - pt.y);
+            if (d < hitRadius && d < minDist) {
+                minDist = d;
+                closestKey = k;
+            }
+        });
+        draggingCornerKey = closestKey;
+        if (draggingCornerKey) renderManualCornerEditorCanvas();
+    };
+
+    const onMove = (clientX, clientY) => {
+        if (!isEditingManualCorners || !draggingCornerKey || !appState.scanner.fiducialCorners) return;
+        const pt = getCanvasPointerCoords(canvas, clientX, clientY);
+        appState.scanner.fiducialCorners[draggingCornerKey] = {
+            x: Math.max(0, Math.min(canvas.width, pt.x)),
+            y: Math.max(0, Math.min(canvas.height, pt.y))
+        };
+        renderManualCornerEditorCanvas();
+    };
+
+    const onUp = () => {
+        if (!draggingCornerKey) return;
+        draggingCornerKey = null;
+        renderManualCornerEditorCanvas();
+    };
+
+    canvas.addEventListener('mousedown', e => onDown(e.clientX, e.clientY));
+    window.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', onUp);
+
+    canvas.addEventListener('touchstart', e => {
+        if (!isEditingManualCorners) return;
+        const t0 = e.touches[0];
+        if (t0) {
+            e.preventDefault();
+            onDown(t0.clientX, t0.clientY);
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', e => {
+        if (!isEditingManualCorners || !draggingCornerKey) return;
+        const t0 = e.touches[0];
+        if (t0) {
+            e.preventDefault();
+            onMove(t0.clientX, t0.clientY);
+        }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', onUp);
+}
+
+function applyManualCornersAndRescan() {
+    const raw = appState.scanner.rawPhotoCanvas;
+    const corners = appState.scanner.fiducialCorners;
+    const ex = appState.activeExam;
+    if (!raw || !corners || !ex) return;
+
+    isEditingManualCorners = false;
+    document.getElementById('btnApplyManualCorners')?.classList.add('hidden');
+    const btnEdit = document.getElementById('uiBtnEditCorners');
+    if (btnEdit) btnEdit.textContent = t('btnEditCorners');
+
+    const detectedW = Math.hypot(corners.tr.x - corners.tl.x, corners.tr.y - corners.tl.y);
+    const detectedH = Math.hypot(corners.bl.x - corners.tl.x, corners.bl.y - corners.tl.y);
+    const isCardLandscape = detectedW > detectedH * 1.08;
+
+    const destW = isCardLandscape ? 920 : 700;
+    const destH = isCardLandscape ? 700 : 920;
+
+    const scannerCanvas = document.getElementById('omrScannerCanvas');
+    if (scannerCanvas) {
+        scannerCanvas.width = destW;
+        scannerCanvas.height = destH;
+    }
+
+    const warpedFull = warpSheetPerspectiveToCanonical(raw, corners, destW, destH, false);
+    const warpedMin = warpSheetPerspectiveToCanonical(raw, corners, destW, destH, true);
+
+    const scoreFull = measureSheetFormatConfidence(warpedFull, ex, false);
+    const scoreMin = measureSheetFormatConfidence(warpedMin, ex, true);
+
+    const isMinimalDetected = scoreMin > scoreFull * 1.04;
+    appState.scanner.detectedSheetMinimal = isMinimalDetected;
+    appState.scanner.lastImageSource = isMinimalDetected ? warpedMin : warpedFull;
+
+    runOMRPixelAnalysis();
+    extractStudentNameStripFromAlignedCanvas();
+    showToast(t('toastScanComplete'), 'fa-check');
 }
 
 function updateSensitivityLabel(val) {
@@ -3874,6 +4068,11 @@ function applyTranslations() {
         : t('scannerOrientPortrait');
     setText('uiScannerOrientLabel', orientText);
     setText('uiModalOrientLabel', orientText);
+    setText('uiCornerDragHint', t('cornerDragHint'));
+    setText('uiBtnApplyCorners', t('btnApplyCorners'));
+    if (typeof isEditingManualCorners !== 'undefined') {
+        setText('uiBtnEditCorners', isEditingManualCorners ? t('btnCancelCorners') : t('btnEditCorners'));
+    }
 }
 
 /* Exposición global explícita */
@@ -3913,7 +4112,9 @@ Object.assign(window, {
     openRosterImporterModal,
     selectStudentFromRoster,
     onSavedExamsSearch,
-    goToSavedExamsPage
+    goToSavedExamsPage,
+    toggleManualCornerEditor,
+    applyManualCornersAndRescan
 });
 
 window.addEventListener('DOMContentLoaded', () => {

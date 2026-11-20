@@ -350,6 +350,17 @@
                             <strong id="sensitivityValueLabel" class="font-mono">Media (38%)</strong>
                         </label>
                         <input type="range" id="omrThresholdRange" min="18" max="65" value="38" oninput="updateSensitivityLabel(this.value)" onchange="rescanCurrentCanvasImage()">
+                        <div class="scanner-frame-adjust-row">
+                            <span id="uiCornerDragHint">¿Esquinas desfasadas? Arrástralas en la foto:</span>
+                            <div class="scanner-frame-adjust-btns">
+                                <button type="button" id="btnToggleCornerEditor" class="btn-mini" onclick="toggleManualCornerEditor()">
+                                    <i class="fa-solid fa-vector-square"></i> <span id="uiBtnEditCorners">Ajustar 4 Esquinas</span>
+                                </button>
+                                <button type="button" id="btnApplyManualCorners" class="btn-emerald-md hidden" style="padding:0.28rem 0.65rem; font-size:0.73rem;" onclick="applyManualCornersAndRescan()">
+                                    <i class="fa-solid fa-check"></i> <span id="uiBtnApplyCorners">Aplicar</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Escenario Visual: Video en vivo + Canvas de procesamiento OMR -->
