@@ -31,8 +31,8 @@ const BRAND_PROFILES = {
         badgeClass: 'badge-blue',
         badgeEs: 'Interactivo',
         badgeEn: 'Interactive',
-        subEs: 'Generador algorítmico de Sopas de Letras y Crucigramas',
-        subEn: 'Algorithmic Word Search & Crossword Generator'
+        subEs: 'Generador de Sopas de Letras y Crucigramas',
+        subEn: 'Word Search & Crossword Generator'
     },
     uparwheel: {
         titleHtml: 'Upar<span class="text-emerald">Wheel</span>',
@@ -41,8 +41,8 @@ const BRAND_PROFILES = {
         badgeClass: 'badge-emerald',
         badgeEs: 'Interactivo',
         badgeEn: 'Interactive',
-        subEs: 'Ruleta de participación y selector interactivo para el aula',
-        subEn: 'Interactive participation wheel and classroom selector'
+        subEs: 'Ruleta de selección y participación interactiva',
+        subEn: 'Interactive selection and participation wheel'
     },
     upartrivia: {
         titleHtml: 'Upar<span class="text-amber">Trivia</span>',
@@ -51,8 +51,8 @@ const BRAND_PROFILES = {
         badgeClass: 'badge-amber',
         badgeEs: 'Edición Millonario',
         badgeEn: 'Millionaire Edition',
-        subEs: 'Plataforma interactiva de trivias por niveles para el aula',
-        subEn: 'Interactive tiered trivia platform for the classroom'
+        subEs: 'Plataforma interactiva de trivias por niveles',
+        subEn: 'Interactive tiered trivia platform'
     },
     upargrade: {
         titleHtml: 'Upar<span class="text-rose">Grade</span>',
@@ -61,8 +61,8 @@ const BRAND_PROFILES = {
         badgeClass: 'badge-rose',
         badgeEs: 'ICFES & OMR',
         badgeEn: 'ICFES & OMR',
-        subEs: 'Generador de hojas de respuesta y calificación óptica automatizada',
-        subEn: 'OMR answer sheet generator and automated optical grading'
+        subEs: 'Generador de hojas de respuesta y calificación óptica',
+        subEn: 'OMR answer sheet generator and optical grading'
     }
 };
 
