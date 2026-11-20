@@ -69,6 +69,7 @@ const BRAND_PROFILES = {
 const SUITE_I18N = {
     es: {
         navHome: 'Inicio',
+        settingsLabel: 'Ajustes',
         mobileInstallText: 'Instalar App',
         installMaster: 'Instalar App',
         mobileLangText: 'Idioma',
@@ -114,6 +115,7 @@ const SUITE_I18N = {
     },
     en: {
         navHome: 'Home',
+        settingsLabel: 'Settings',
         btnMasterBackup: 'Backup',
         installMaster: 'Install App',
         mobileInstallText: 'Install App',
@@ -446,6 +448,7 @@ function applySuiteLanguage() {
     };
 
     setTxt('uiNavHome', st('navHome'));
+    setTxt('uiSuiteSettingsLabel', st('settingsLabel'));
     setTxt('uiBtnMasterBackup', st('btnMasterBackup'));
     document.getElementById('uiHeroKicker').innerHTML = st('heroKicker');
     setTxt('uiHeroTitle', st('heroTitle'));

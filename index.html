@@ -96,14 +96,14 @@
             <div class="suite-actions" id="suiteActionsWrapper">
                 <button type="button" id="btnMobileMoreMenu" class="btn-suite-util btn-icon mobile-more-toggle" onclick="toggleMobileActionsMenu(event)" title="Más opciones" aria-expanded="false">
                     <i class="fa-solid fa-sliders text-indigo"></i>
+                    <span id="uiSuiteSettingsLabel" class="suite-settings-label">Ajustes</span>
                 </button>
 
                 <div id="suiteActionsDropdown" class="suite-actions-menu">
                     <!-- Botón Instalar App (Se muestra automáticamente cuando el dispositivo permite instalar) -->
                     <button type="button" id="btnInstallPWA" class="btn-suite-util hidden" onclick="installSuitePWA(); closeMobileActionsMenu();" title="Instalar UparApp en tu dispositivo">
                         <i class="fa-solid fa-download text-indigo"></i>
-                        <span class="hide-md" id="uiInstallMaster">Instalar App</span>
-                        <span class="only-mobile-label" id="uiMobileInstallText">Instalar App</span>
+                        <span id="uiInstallMaster">Instalar App</span>
                     </button>
 
                     <!-- Idioma Global ES / EN -->
@@ -122,15 +122,13 @@
                     <!-- Sincronizar por QR -->
                     <button type="button" class="btn-suite-util" onclick="openSuiteQrSyncModal(); closeMobileActionsMenu();" title="Sincronizar con QR (PC ↔ Celular)">
                         <i class="fa-solid fa-qrcode text-indigo"></i>
-                        <span class="hide-md" id="uiBtnSuiteQr">QR Sync</span>
-                        <span class="only-mobile-label" id="uiMobileQrText">QR Sync</span>
+                        <span id="uiBtnSuiteQr">QR Sync</span>
                     </button>
 
                     <!-- Respaldo Maestro Unificado JSON -->
                     <button type="button" class="btn-suite-util" onclick="openBackupModal(); closeMobileActionsMenu();" title="Respaldo Maestro de las 4 Apps">
                         <i class="fa-solid fa-database text-indigo"></i>
-                        <span id="uiBtnMasterBackup" class="hide-md">Respaldo</span>
-                        <span class="only-mobile-label" id="uiMobileBackupText">Respaldo</span>
+                        <span id="uiBtnMasterBackup">Respaldo</span>
                     </button>
 
                     <!-- Pantalla Completa Global -->

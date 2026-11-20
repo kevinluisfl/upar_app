@@ -876,11 +876,11 @@ body {
     }
 }
 
-@media (min-width: 761px) {
+/* @media (min-width: 761px) {
     .mobile-more-toggle {
         display: none !important;
     }
-}
+} */
 
 .suite-qr-hub-card {
     max-width: 500px;
@@ -960,4 +960,105 @@ body {
     .suite-qr-tabs {
         grid-template-columns: 1fr;
     }
+}
+
+/*  */
+
+/* Menú desplegable de utilidades/configuración a la derecha en TODO tamaño de pantalla */
+.suite-actions {
+    position: relative;
+}
+
+.mobile-more-toggle {
+    display: inline-flex !important;
+}
+
+.suite-actions-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 0.45rem);
+    right: 0;
+    min-width: 195px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.85rem;
+    padding: 0.4rem;
+    box-shadow: var(--shadow-lg);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+    z-index: 90;
+}
+
+/* Centrado real del menú central en pantallas grandes y etiqueta "Ajustes" solo en escritorio */
+@media (min-width: 900px) {
+    .topbar-inner {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+    }
+
+    .suite-brand {
+        justify-self: start;
+    }
+
+    .suite-nav {
+        justify-self: center;
+    }
+
+    .suite-actions {
+        justify-self: end;
+    }
+}
+
+.suite-settings-label {
+    display: none;
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin-left: 0.35rem;
+}
+
+@media (min-width: 900px) {
+    .mobile-more-toggle {
+        width: auto !important;
+        padding: 0 0.7rem !important;
+    }
+
+    .suite-settings-label {
+        display: inline;
+    }
+}
+
+.suite-actions-menu.open {
+    display: flex;
+}
+
+.suite-actions-menu .btn-suite-util,
+.suite-actions-menu .btn-icon {
+    width: 100%;
+    height: auto;
+    justify-content: flex-start;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.55rem;
+    border-color: transparent;
+    background: transparent;
+    gap: 0.55rem;
+}
+
+.suite-actions-menu .btn-suite-util:hover,
+.suite-actions-menu .btn-icon:hover {
+    background: var(--card-inner);
+    border-color: var(--border);
+}
+
+.suite-actions-menu .only-mobile-label {
+    display: inline;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.suite-actions-menu #suiteLangLabel {
+    font-size: 0.72rem;
+    opacity: 0.8;
 }
