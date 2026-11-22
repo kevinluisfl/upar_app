@@ -691,9 +691,17 @@ input:focus, select:focus {
     position: absolute;
 }
 .minimal-card .fiducial-mark {
-    width: 12px;
-    height: 12px;
+    width: 13px;
+    height: 13px;
 }
+
+.minimal-card .omr-print-bubble {
+    width: 16px;
+    height: 16px;
+    font-size: 0.58rem;
+    border-width: 1.4px;
+}
+
 .fiducial-mark.tl { top: 8px; left: 8px; }
 .fiducial-mark.tr { top: 8px; right: 8px; }
 .fiducial-mark.bl { bottom: 8px; left: 8px; }
@@ -843,12 +851,6 @@ input:focus, select:focus {
     color: #000000;
 }
 
-.minimal-card .omr-print-bubble {
-    width: 15px;
-    height: 15px;
-    font-size: 0.54rem;
-    border-width: 1.3px;
-}
 
 .omr-print-bubble.teacher-filled {
     background: #000000 !important;
@@ -1356,6 +1358,17 @@ input:focus, select:focus {
     }
     .fiducial-mark {
         background: #000000 !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+    .icfes-sheet-card,
+    .icfes-sheet-card * {
+        color: #000000 !important;
+        border-color: #000000 !important;
+    }
+    .omr-print-bubble.teacher-filled {
+        background: #000000 !important;
+        color: #ffffff !important;
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
     }

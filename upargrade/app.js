@@ -1032,7 +1032,7 @@ function buildSingleSheetHTML(ex, showTeacherKey, isMinimal, copiesCount) {
                     </div>
                 </div>
 
-                <div class="minimal-name-line">
+                <div class="minimal-name-line" style="margin-top: 4px; gap: 14px;">
                     <span style="flex:1;">${t('sheetStudentShort')} ___________________________</span>
                     <span>${t('sheetGradeLabel')} ______</span>
                 </div>
@@ -1143,35 +1143,32 @@ function getOMRBubbleGeometry(ex, width = 700, height = 920, isMinimal = false) 
         : (ex.questionCount > 30 ? 3 : 2);
     const perCol = Math.ceil(ex.questionCount / numCols);
 
-    const marginX = Math.round((isMinimal ? 26 : 40) * s);
-    // Cabecera adaptativa: da más aire al nombre en formato simplificado cuando hay altura disponible
-    const minHeaderH = isMinimal ? Math.max(82 * s, height * 0.145) : Math.max(188 * s, height * 0.25);
-    const startY = Math.round(minHeaderH);
-    const bottomPad = Math.round((isMinimal ? 24 : 34) * s);
+    const marginX = Math.round((isMinimal ? 26 : 42) * s);
+    const startY = Math.round((isMinimal ? 94 : 194) * s);
+    const bottomPad = Math.round((isMinimal ? 24 : 36) * s);
 
     const availableW = width - marginX * 2;
-    const colGap = Math.round((isMinimal ? 12 : 18) * s);
+    const colGap = Math.round((isMinimal ? 14 : 18) * s);
     const colWidth = (availableW - (numCols - 1) * colGap) / numCols;
 
-    // Aprovechar todo el alto libre hasta abajo según la cantidad de preguntas por columna
-    const availH = Math.max(100, height - startY - bottomPad);
+    const availH = Math.max(120, height - startY - bottomPad);
     const rowHeight = availH / perCol;
 
     const widthFactor = (Number(appState?.scanner?.bubbleWidthScale) || 100) / 100;
     const labelOffset = Math.round((isMinimal ? 32 : 44) * s * Math.min(1.15, Math.max(0.75, widthFactor)));
     const bubbleAreaW = Math.max(40, colWidth - labelOffset - Math.round(8 * s));
     const baseSpacing = Math.min(
-        Math.round((isMinimal ? 34 : 38) * s),
+        Math.round((isMinimal ? 28 : 34) * s),
         bubbleAreaW / activeLetters.length
     );
     const bubbleSpacing = baseSpacing * widthFactor;
 
     const bubbleRadius = Math.max(
-        5,
+        6,
         Math.min(
-            Math.round(rowHeight * 0.36),
+            Math.round(rowHeight * 0.35),
             Math.round(bubbleSpacing * 0.40),
-            Math.round(14.5 * s)
+            Math.round(13.5 * s)
         )
     );
 
@@ -1184,7 +1181,7 @@ function getOMRBubbleGeometry(ex, width = 700, height = 920, isMinimal = false) 
 
         for (let q = startQ; q <= endQ; q++) {
             const rowIdx = q - startQ;
-            const cy = Math.round(startY + rowHeight * 0.5 + rowIdx * rowHeight);
+            const cy = Math.round(startY + rowHeight * 0.52 + rowIdx * rowHeight);
             coords[q] = {};
 
             const bubblesStartX = Math.round(colLeft + labelOffset + bubbleRadius);
@@ -1245,15 +1242,14 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, W, H);
 
-    ctx.strokeStyle = isMinimal ? '#64748b' : '#334155';
-    ctx.lineWidth = Math.max(1, 1.5 * s);
+    ctx.strokeStyle = isMinimal ? '#475569' : '#334155';
+    ctx.lineWidth = Math.max(1.1, 1.5 * s);
     if (isMinimal) ctx.setLineDash([5 * s, 4 * s]);
     ctx.strokeRect(2 * s, 2 * s, W - 4 * s, H - 4 * s);
     ctx.setLineDash([]);
 
-    // 4 Marcas fiduciales negras en las esquinas
     ctx.fillStyle = '#000000';
-    const fSize = Math.round((isMinimal ? 14 : 20) * s);
+    const fSize = Math.round((isMinimal ? 15 : 20) * s);
     const fMargin = Math.round((isMinimal ? 10 : 14) * s);
     ctx.fillRect(fMargin, fMargin, fSize, fSize);
     ctx.fillRect(W - fMargin - fSize, fMargin, fSize, fSize);
@@ -1264,18 +1260,18 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
     const mx = geom.marginX;
     const innerW = W - mx * 2;
 
-if (isMinimal) {
+    if (isMinimal) {
         const rightTag = simulatedAnswers ? '★ KEY ★' : `${ex.questionCount}Q`;
+        const headerY = fMargin + fSize + Math.round(13 * s);
+
         ctx.fillStyle = '#000000';
-        ctx.font = `800 ${Math.max(10, Math.round(12.5 * s))}px Inter, sans-serif`;
+        ctx.font = `800 ${Math.max(10, Math.round(13 * s))}px Inter, sans-serif`;
         ctx.textBaseline = 'alphabetic';
 
-        const tagX = W - mx;
-        const headerY = fMargin + Math.round(24 * s);
         ctx.textAlign = 'right';
-        ctx.fillText(rightTag, tagX, headerY);
+        ctx.fillText(rightTag, W - mx, headerY);
 
-        const maxTitleW = Math.max(60, tagX - ctx.measureText(rightTag).width - mx - Math.round(10 * s));
+        const maxTitleW = Math.max(60, innerW - ctx.measureText(rightTag).width - Math.round(12 * s));
         ctx.textAlign = 'left';
         let titleText = `${ex.title} (${ex.course})`;
         while (ctx.measureText(titleText).width > maxTitleW && titleText.length > 8) {
@@ -1283,26 +1279,25 @@ if (isMinimal) {
         }
         ctx.fillText(titleText, mx, headerY);
 
-        const lineSepY = headerY + Math.round(8 * s);
+        const sepY = headerY + Math.round(6 * s);
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = Math.max(1, 1.4 * s);
+        ctx.lineWidth = Math.max(1.1, 1.5 * s);
         ctx.beginPath();
-        ctx.moveTo(mx, lineSepY);
-        ctx.lineTo(W - mx, lineSepY);
+        ctx.moveTo(mx, sepY);
+        ctx.lineTo(W - mx, sepY);
         ctx.stroke();
 
-        // Línea de Nombre y Nota debajo del separador
-        const nameY = Math.max(lineSepY + Math.round(17 * s), Math.round(geom.startY - 12 * s));
+        const nameY = Math.max(sepY + Math.round(22 * s), Math.round(geom.startY - 12 * s));
         ctx.textAlign = 'left';
         ctx.font = `700 ${Math.max(8.5, Math.round(11 * s))}px Inter, sans-serif`;
 
         const nameLbl = `${t('sheetStudentShort')} `;
         const gradeLbl = `${t('sheetGradeLabel')} `;
         const gradeBlockW = Math.round(86 * s);
-        const nameBlockEnd = W - mx - gradeBlockW - Math.round(12 * s);
+        const nameBlockEnd = W - mx - gradeBlockW - Math.round(16 * s);
 
         ctx.fillText(nameLbl, mx, nameY);
-        const nameLineStart = mx + ctx.measureText(nameLbl).width + Math.round(4 * s);
+        const nameLineStart = mx + ctx.measureText(nameLbl).width + Math.round(7 * s);
         ctx.lineWidth = Math.max(0.9, 1.1 * s);
         ctx.beginPath();
         ctx.moveTo(nameLineStart, nameY + Math.round(2 * s));
@@ -1311,20 +1306,18 @@ if (isMinimal) {
 
         const gradeStartX = W - mx - gradeBlockW;
         ctx.fillText(gradeLbl, gradeStartX, nameY);
-        const gradeLineStart = gradeStartX + ctx.measureText(gradeLbl).width + Math.round(4 * s);
+        const gradeLineStart = gradeStartX + ctx.measureText(gradeLbl).width + Math.round(7 * s);
         ctx.beginPath();
         ctx.moveTo(gradeLineStart, nameY + Math.round(2 * s));
         ctx.lineTo(W - mx, nameY + Math.round(2 * s));
         ctx.stroke();
     } else {
-        // 1. CAJA SUPERIOR DE TÍTULO + RECUADRO DE PREGUNTAS + QR A LA DERECHA SIN SOLAPAR
         const boxTop = Math.round(34 * s);
-        const boxH = Math.round(54 * s);
+        const boxH = Math.round(52 * s);
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = Math.max(1.2, 1.8 * s);
         ctx.strokeRect(mx, boxTop, innerW, boxH);
 
-        // Recuadro "20 Q | MAX: 10" colocado a la izquierda del QR con margen
         const badgeText = `${ex.questionCount} Q | MAX: ${ex.maxGrade}`;
         ctx.font = `800 ${Math.max(8, Math.round(10 * s))}px "JetBrains Mono", monospace`;
         const badgePadX = Math.round(8 * s);
@@ -1340,8 +1333,7 @@ if (isMinimal) {
         ctx.textBaseline = 'middle';
         ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2 + 0.5 * s);
 
-        // Título y curso/asignatura a la izquierda (sin texto redundante de formato OMR)
-        const maxLeftTextW = Math.max(80, badgeX - (mx + Math.round(18 * s)));
+        const maxLeftTextW = Math.max(80, badgeX - (mx + Math.round(16 * s)));
         ctx.textAlign = 'left';
         ctx.textBaseline = 'alphabetic';
         ctx.fillStyle = '#000000';
@@ -1350,7 +1342,7 @@ if (isMinimal) {
         while (ctx.measureText(mainTitle).width > maxLeftTextW && mainTitle.length > 6) {
             mainTitle = mainTitle.slice(0, -2) + '…';
         }
-        ctx.fillText(mainTitle, mx + Math.round(12 * s), boxTop + Math.round(23 * s));
+        ctx.fillText(mainTitle, mx + Math.round(12 * s), boxTop + Math.round(22 * s));
 
         ctx.font = `700 ${Math.max(8.5, Math.round(10.8 * s))}px Inter, sans-serif`;
         ctx.fillStyle = '#334155';
@@ -1358,11 +1350,10 @@ if (isMinimal) {
         while (ctx.measureText(subTitle).width > maxLeftTextW && subTitle.length > 8) {
             subTitle = subTitle.slice(0, -2) + '…';
         }
-        ctx.fillText(subTitle, mx + Math.round(12 * s), boxTop + Math.round(41 * s));
+        ctx.fillText(subTitle, mx + Math.round(12 * s), boxTop + Math.round(40 * s));
 
-        // 2. CAJA DE ESTUDIANTE / FECHA / NOTA
         const stTop = boxTop + boxH + Math.round(8 * s);
-        const stH = Math.round(46 * s);
+        const stH = Math.round(44 * s);
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = Math.max(1, 1.4 * s);
         ctx.strokeRect(mx, stTop, innerW, stH);
@@ -1401,7 +1392,6 @@ if (isMinimal) {
         ctx.lineTo(xCol3 + wCol3, lineY);
         ctx.stroke();
 
-        // 3. BARRA DE INSTRUCCIONES
         const instTop = stTop + stH + Math.round(8 * s);
         const instH = Math.round(32 * s);
         ctx.fillStyle = '#f1f5f9';
@@ -1435,14 +1425,13 @@ if (isMinimal) {
         }
     }
 
-    // 4. RECUADROS DE COLUMNAS Y BURBUJAS DE RESPUESTA
     const activeLetters = LETTERS.slice(0, ex.optionsCount);
-    const colBoxH = Math.round(geom.perCol * geom.rowHeight + 8 * s);
+    const colBoxH = Math.round(geom.perCol * geom.rowHeight + 10 * s);
 
     for (let c = 0; c < geom.numCols; c++) {
         const colLeft = geom.marginX + c * (geom.colWidth + geom.colGap);
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = Math.max(1, 1.2 * s);
+        ctx.lineWidth = Math.max(1.1, 1.3 * s);
         ctx.strokeRect(colLeft, geom.startY - Math.round(4 * s), geom.colWidth, colBoxH);
     }
 
@@ -1462,12 +1451,12 @@ if (isMinimal) {
             ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
             ctx.fillStyle = isFilled ? '#0f172a' : '#ffffff';
             ctx.fill();
-            ctx.lineWidth = Math.max(1.1, 1.5 * s);
+            ctx.lineWidth = Math.max(1.2, 1.6 * s);
             ctx.strokeStyle = '#000000';
             ctx.stroke();
 
             ctx.fillStyle = isFilled ? '#ffffff' : '#000000';
-            ctx.font = `800 ${Math.max(7, Math.round(b.r * 0.92))}px "JetBrains Mono", monospace`;
+            ctx.font = `800 ${Math.max(7.5, Math.round(b.r * 0.92))}px "JetBrains Mono", monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(letter, b.x, b.y + 0.5 * s);
@@ -2100,7 +2089,6 @@ function detectFiducialCornersInPhoto(rawCanvas) {
     const ctx = rawCanvas.getContext('2d');
     const imgData = ctx.getImageData(0, 0, W, H).data;
 
-    // 1. Convertir a luminancia y calcular imagen integral para umbral adaptativo rápido
     const gray = new Uint8Array(W * H);
     const integral = new Float64Array((W + 1) * (H + 1));
 
@@ -2128,21 +2116,19 @@ function detectFiducialCornersInPhoto(rawCanvas) {
         return sum / count;
     }
 
-// 2. Binarizar píxeles oscuros con margen para sombras y desenfoque de cámara
     const binary = new Uint8Array(W * H);
-    const winR = Math.max(20, Math.round(Math.min(W, H) * 0.05));
+    const winR = Math.max(18, Math.round(Math.min(W, H) * 0.045));
     for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
             const mean = getLocalMean(x, y, winR);
-            binary[y * W + x] = (gray[y * W + x] < mean * 0.80 && gray[y * W + x] < 175) ? 1 : 0;
+            binary[y * W + x] = (gray[y * W + x] < mean * 0.76 && gray[y * W + x] < 165) ? 1 : 0;
         }
     }
 
-    // 3. Etiquetado de componentes conexos (Blobs) para hallar candidatos a cuadros fiduciales
     const visited = new Uint8Array(W * H);
     const candidates = [];
-    const minSide = Math.max(4, Math.round(Math.min(W, H) * 0.006));
-    const maxSide = Math.round(Math.min(W, H) * 0.12);
+    const minSide = Math.max(5, Math.round(Math.min(W, H) * 0.008));
+    const maxSide = Math.round(Math.min(W, H) * 0.10);
 
     const stackX = new Int32Array(W * H);
     const stackY = new Int32Array(W * H);
@@ -2196,11 +2182,11 @@ function detectFiducialCornersInPhoto(rawCanvas) {
             if (bw < minSide || bh < minSide || bw > maxSide || bh > maxSide) continue;
 
             const aspect = bw / bh;
-            if (aspect < 0.50 || aspect > 2.0) continue;
+            if (aspect < 0.55 || aspect > 1.85) continue;
 
             const bboxArea = bw * bh;
             const fillRatio = pixelCount / bboxArea;
-            if (fillRatio < 0.42) continue;                 
+            if (fillRatio < 0.48) continue;
 
             candidates.push({
                 cx: (minX + maxX) / 2,
@@ -2215,54 +2201,65 @@ function detectFiducialCornersInPhoto(rawCanvas) {
 
     if (candidates.length < 4) return null;
 
-    // 4. Elegir el mejor candidato en cada uno de los 4 cuadrantes de la hoja principal
     function pickBestInQuadrant(filterFn, targetX, targetY) {
         const list = candidates.filter(filterFn);
         if (list.length === 0) return null;
         list.sort((a, b) => {
             const distA = Math.hypot(a.cx - targetX, a.cy - targetY);
             const distB = Math.hypot(b.cx - targetX, b.cy - targetY);
-            // Priorizar cercanía a la esquina y solidez cuadrada
-            return (distA - a.fill * 40) - (distB - b.fill * 40);
+            return (distA - a.fill * 45) - (distB - b.fill * 45);
         });
         return list[0];
     }
 
-    // Si en la foto sale un pedazo de otra hoja a la derecha (como en tus capturas),
-    // evitamos irnos al borde derecho extremo si hay una columna divisoria antes.
-    const tl = pickBestInQuadrant(c => c.cx < W * 0.52 && c.cy < H * 0.48, W * 0.10, H * 0.10);
-    const bl = pickBestInQuadrant(c => c.cx < W * 0.52 && c.cy > H * 0.52, W * 0.10, H * 0.90);
+    const tl = pickBestInQuadrant(c => c.cx < W * 0.50 && c.cy < H * 0.48, W * 0.12, H * 0.12);
+    const bl = pickBestInQuadrant(c => c.cx < W * 0.50 && c.cy > H * 0.52, W * 0.12, H * 0.88);
 
-    // Para TR y BR buscamos que estén alineados verticalmente entre sí y formen un rectángulo coherente con TL y BL
-    const trCandidates = candidates.filter(c => c.cx > W * 0.45 && c.cy < H * 0.40);
-    const brCandidates = candidates.filter(c => c.cx > W * 0.45 && c.cy > H * 0.60);
+    const trCandidates = candidates.filter(c => c.cx > W * 0.45 && c.cy < H * 0.48);
+    const brCandidates = candidates.filter(c => c.cx > W * 0.45 && c.cy > H * 0.52);
 
-    let bestPair = null;
-    let bestPairScore = Infinity;
+    let bestQuad = null;
+    let bestScore = Infinity;
 
     for (const trC of trCandidates) {
         for (const brC of brCandidates) {
             const dxRight = Math.abs(trC.cx - brC.cx);
-            if (dxRight > W * 0.15) continue; // TR y BR deben tener X parecido
-            let score = dxRight * 2;
-            if (tl) score += Math.abs(trC.cy - tl.cy) * 1.5;
-            if (bl) score += Math.abs(brC.cy - bl.cy) * 1.5;
-            if (tl && bl) {
+            if (dxRight > W * 0.14) continue;
+
+            let score = dxRight * 2.2;
+            if (tl) {
                 const topW = trC.cx - tl.cx;
-                const botW = brC.cx - bl.cx;
-                score += Math.abs(topW - botW) * 2;
+                if (topW < W * 0.28) continue;
+                score += Math.abs(trC.cy - tl.cy) * 1.5;
+                score += Math.abs(tl.cx - (W - trC.cx)) * 0.4;
             }
-            if (score < bestPairScore) {
-                bestPairScore = score;
-                bestPair = { tr: trC, br: brC };
+            if (bl) {
+                const botW = brC.cx - bl.cx;
+                if (botW < W * 0.28) continue;
+                score += Math.abs(brC.cy - bl.cy) * 1.5;
+            }
+            if (tl && bl) {
+                const leftH = bl.cy - tl.cy;
+                const rightH = brC.cy - trC.cy;
+                if (leftH < H * 0.28 || rightH < H * 0.28) continue;
+                score += Math.abs(leftH - rightH) * 1.8;
+            }
+
+            if (score < bestScore) {
+                bestScore = score;
+                bestQuad = { tr: trC, br: brC };
             }
         }
     }
 
-    const tr = bestPair ? bestPair.tr : pickBestInQuadrant(c => c.cx > W * 0.45 && c.cy < H * 0.40, W * 0.88, H * 0.08);
-    const br = bestPair ? bestPair.br : pickBestInQuadrant(c => c.cx > W * 0.45 && c.cy > H * 0.60, W * 0.88, H * 0.92);
+    const tr = bestQuad ? bestQuad.tr : pickBestInQuadrant(c => c.cx > W * 0.50 && c.cy < H * 0.48, W * 0.88, H * 0.12);
+    const br = bestQuad ? bestQuad.br : pickBestInQuadrant(c => c.cx > W * 0.50 && c.cy > H * 0.52, W * 0.88, H * 0.88);
 
     if (!tl || !tr || !bl || !br) return null;
+
+    const spanW = Math.hypot(tr.x ?? tr.cx - (tl.x ?? tl.cx), (tr.y ?? tr.cy) - (tl.y ?? tl.cy));
+    const spanH = Math.hypot((bl.x ?? bl.cx) - (tl.x ?? tl.cx), (bl.y ?? bl.cy) - (tl.y ?? tl.cy));
+    if (spanW < W * 0.25 || spanH < H * 0.25) return null;
 
     return {
         tl: { x: tl.cx, y: tl.cy },
@@ -2375,18 +2372,73 @@ function measureSheetFormatConfidence(warpedCanvas, ex, isMinimal) {
 }
 
 function enhanceSheetContrast(canvas) {
-    if (!canvas) return;
+    if (!canvas || !canvas.width || !canvas.height) return;
     const ctx = canvas.getContext('2d');
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const w = canvas.width;
+    const h = canvas.height;
+    const imgData = ctx.getImageData(0, 0, w, h);
     const d = imgData.data;
-    const contrast = 1.22; // leve aumento de contraste para aclarar papel gris y oscurecer tinta/lápiz
+
+    // 1. Balance de blancos / normalización suave según percentil alto de luminancia
+    const hist = new Uint32Array(256);
+    const lumaArr = new Float32Array(w * h);
+
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+        const luma = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        lumaArr[p] = luma;
+        hist[Math.min(255, Math.max(0, Math.round(luma)))]++;
+    }
+
+    const totalPx = w * h;
+    let acc = 0;
+    let whitePoint = 245;
+    for (let v = 255; v >= 120; v--) {
+        acc += hist[v];
+        if (acc >= totalPx * 0.04) {
+            whitePoint = Math.max(190, v);
+            break;
+        }
+    }
+
+    const whiteGain = 252 / whitePoint;
+    const contrast = 1.24;
     const intercept = 128 * (1 - contrast);
 
+    const balanced = new Float32Array(d.length);
     for (let i = 0; i < d.length; i += 4) {
-        d[i] = Math.max(0, Math.min(255, d[i] * contrast + intercept));
-        d[i + 1] = Math.max(0, Math.min(255, d[i + 1] * contrast + intercept));
-        d[i + 2] = Math.max(0, Math.min(255, d[i + 2] * contrast + intercept));
+        for (let c = 0; c < 3; c++) {
+            const wb = Math.min(255, d[i + c] * whiteGain);
+            balanced[i + c] = Math.max(0, Math.min(255, wb * contrast + intercept));
+        }
+        balanced[i + 3] = d[i + 3];
     }
+
+    // 2. Nitidez ligera (unsharp mask 3x3 sobre luminancia) para definir bordes de burbujas y texto
+    const sharpAmount = 0.45;
+    for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+            const idx = (y * w + x) * 4;
+            const centerLuma = 0.299 * balanced[idx] + 0.587 * balanced[idx + 1] + 0.114 * balanced[idx + 2];
+
+            const topIdx = ((y - 1) * w + x) * 4;
+            const botIdx = ((y + 1) * w + x) * 4;
+            const leftIdx = (y * w + (x - 1)) * 4;
+            const rightIdx = (y * w + (x + 1)) * 4;
+
+            const neighborsAvg = (
+                (0.299 * balanced[topIdx] + 0.587 * balanced[topIdx + 1] + 0.114 * balanced[topIdx + 2]) +
+                (0.299 * balanced[botIdx] + 0.587 * balanced[botIdx + 1] + 0.114 * balanced[botIdx + 2]) +
+                (0.299 * balanced[leftIdx] + 0.587 * balanced[leftIdx + 1] + 0.114 * balanced[leftIdx + 2]) +
+                (0.299 * balanced[rightIdx] + 0.587 * balanced[rightIdx + 1] + 0.114 * balanced[rightIdx + 2])
+            ) * 0.25;
+
+            const delta = (centerLuma - neighborsAvg) * sharpAmount;
+            d[idx] = Math.max(0, Math.min(255, balanced[idx] + delta));
+            d[idx + 1] = Math.max(0, Math.min(255, balanced[idx + 1] + delta));
+            d[idx + 2] = Math.max(0, Math.min(255, balanced[idx + 2] + delta));
+        }
+    }
+
     ctx.putImageData(imgData, 0, 0);
 }
 
@@ -2943,11 +2995,47 @@ function extractStudentNameStripFromAlignedCanvas() {
     const W = src.width;
     const H = src.height;
     const s = Math.min(W / 560, H / 720);
+    const geom = getOMRBubbleGeometry(appState.activeExam || { questionCount: 20, optionsCount: 4 }, W, H, isMinimal);
+    const mx = geom.marginX;
+    const innerW = W - mx * 2;
 
-    const sx = Math.round(95 * s);
-    const sy = isMinimal ? Math.round(52 * s) : Math.round(108 * s);
-    const sw = isMinimal ? Math.round(250 * s) : Math.round(235 * s);
-    const sh = isMinimal ? Math.round(24 * s) : Math.round(28 * s);
+    let sx;
+    let sy;
+    let sw;
+    let sh;
+
+    if (isMinimal) {
+        const fSize = Math.round(15 * s);
+        const fMargin = Math.round(10 * s);
+        const headerY = fMargin + fSize + Math.round(13 * s);
+        const sepY = headerY + Math.round(6 * s);
+        const nameY = Math.max(sepY + Math.round(22 * s), Math.round(geom.startY - 12 * s));
+        const gradeBlockW = Math.round(86 * s);
+
+        sx = Math.round(mx + 46 * s);
+        sy = Math.max(2, Math.round(nameY - 16 * s));
+        sw = Math.max(80, Math.round(innerW - gradeBlockW - 62 * s));
+        sh = Math.max(18, Math.round(24 * s));
+    } else {
+        const boxTop = Math.round(34 * s);
+        const boxH = Math.round(52 * s);
+        const stTop = boxTop + boxH + Math.round(8 * s);
+        const stH = Math.round(44 * s);
+        const padIn = Math.round(10 * s);
+        const colGapSt = Math.round(12 * s);
+        const usableStW = innerW - padIn * 2 - colGapSt * 2;
+        const wCol1 = Math.floor(usableStW * 0.52);
+
+        sx = Math.round(mx + padIn);
+        sy = Math.round(stTop + 14 * s);
+        sw = Math.max(80, wCol1);
+        sh = Math.max(18, Math.round(stH - 16 * s));
+    }
+
+    sx = Math.max(0, Math.min(W - 1, sx));
+    sy = Math.max(0, Math.min(H - 1, sy));
+    sw = Math.max(1, Math.min(W - sx, sw));
+    sh = Math.max(1, Math.min(H - sy, sh));
 
     cropBox.classList.remove('hidden');
     const ctx = cropCanvas.getContext('2d');
@@ -2955,12 +3043,13 @@ function extractStudentNameStripFromAlignedCanvas() {
     ctx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
 
     const fitScale = Math.min(cropCanvas.width / sw, cropCanvas.height / sh);
-    const dw = Math.round(sw * fitScale);
-    const dh = Math.round(sh * fitScale);
+    const dw = Math.max(1, Math.round(sw * fitScale));
+    const dh = Math.max(1, Math.round(sh * fitScale));
     const dx = Math.round((cropCanvas.width - dw) / 2);
     const dy = Math.round((cropCanvas.height - dh) / 2);
 
     ctx.drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh);
+    enhanceSheetContrast(cropCanvas);
 }
 
 async function runHandwritingOcrOnCrop() {
@@ -2990,12 +3079,15 @@ async function runHandwritingOcrOnCrop() {
         const { data: { text } } = await window.Tesseract.recognize(cropCanvas, 'spa');
         const cleaned = (text || '')
             .replace(/NOMBRE\s*(COMPLETO)?\s*(DEL)?\s*(ESTUDIANTE)?\s*[:.]?/gi, '')
+            .replace(/\bNOTA\b\s*[:.]?/gi, '')
             .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
 
         if (cleaned.length >= 2) {
-            nameInput.value = `${cleaned} - ${ex.course}`;
+            nameInput.value = ex.course && !cleaned.toLowerCase().includes(ex.course.toLowerCase())
+                ? `${cleaned} - ${ex.course}`
+                : cleaned;
             showToast(`Nombre detectado: ${nameInput.value}`, 'fa-user-check');
         } else {
             nameInput.focus();
