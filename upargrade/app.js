@@ -3212,6 +3212,11 @@ function openRosterImporterModal() {
             <p style="font-size:0.78rem; margin-bottom:0.65rem;">
                 Pega aquí el texto copiado de la plataforma (con comas, notas, faltas o correos). Se limpiará automáticamente y quedará listo para elegir en el escáner.
             </p>
+            <div style="display:flex; justify-content:flex-end; margin-bottom:0.35rem;">
+                <button type="button" class="btn-mini-danger" id="btnClearRosterTextarea" title="Borrar el contenido actual del cuadro de texto">
+                    <i class="fa-regular fa-trash-can"></i> Vaciar campo
+                </button>
+            </div>
             <textarea id="rosterRawTextarea" rows="7" placeholder="APELLIDOS, NOMBRES..." style="width:100%; background:var(--card-inner); color:var(--text); border:1px solid var(--border); border-radius:0.7rem; padding:0.6rem; font-size:0.8rem; margin-bottom:0.65rem;">${studentRoster.join('\n')}</textarea>
             <label class="inline-switch" style="display:flex; margin-bottom:0.4rem;">
                 <input type="checkbox" id="rosterInvertChk">
@@ -3234,6 +3239,12 @@ function openRosterImporterModal() {
 
     const ta = overlay.querySelector('#rosterRawTextarea');
     const msgEl = overlay.querySelector('#rosterModalMsg');
+
+    overlay.querySelector('#btnClearRosterTextarea').onclick = () => {
+        ta.value = '';
+        if (msgEl) msgEl.textContent = '';
+        ta.focus();
+    };
 
     overlay.querySelector('#btnCancelRosterModal').onclick = () => overlay.remove();
     overlay.querySelector('#btnSaveRosterModal').onclick = () => {
