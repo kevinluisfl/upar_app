@@ -613,7 +613,80 @@ function playSoundEffect(type) {
         osc.stop(start + duration);
     };
 
-    if (type === 'select') {
+    if (type === 'tick') {
+        // Reloj seco y nítido (tic / tac) sin efecto de gota en agua
+        const isTac = (appState.game?.seconds || 0) % 2 === 1;
+        const baseFreq = isTac ? 1480 : 1920;
+        const t0 = now;
+        const dur = 0.018;
+
+        const osc = ctx.createOscillator();
+        const hp = ctx.createBiquadFilter();
+        const gain = ctx.createGain();
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(baseFreq, t0);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.72, t0 + dur);
+
+        hp.type = 'highpass';
+        hp.frequency.setValueAtTime(950, t0);
+
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.11, t0 + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+        osc.connect(hp);
+        hp.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.004);
+    } else if (type === 'suspense') {
+        // Latido grave "pum-pum" con tensión creciente en ~3s antes del veredicto
+        const hitBeat = (offsetSec, baseHz, peakGain) => {
+            const pumOffsets = [0.0, 0.14];
+            pumOffsets.forEach((rel, idx) => {
+                const tStart = now + offsetSec + rel;
+                const dur = 0.085;
+                const amp = idx === 0 ? peakGain : peakGain * 0.78;
+
+                const osc = ctx.createOscillator();
+                const lp = ctx.createBiquadFilter();
+                const gNode = ctx.createGain();
+
+                osc.type = idx === 0 ? 'triangle' : 'sine';
+                osc.frequency.setValueAtTime(baseHz * 1.45, tStart);
+                osc.frequency.exponentialRampToValueAtTime(Math.max(38, baseHz * 0.62), tStart + dur);
+
+                lp.type = 'lowpass';
+                lp.frequency.setValueAtTime(190, tStart);
+                lp.Q.setValueAtTime(1.4, tStart);
+
+                gNode.gain.setValueAtTime(0.001, tStart);
+                gNode.gain.linearRampToValueAtTime(amp, tStart + 0.005);
+                gNode.gain.exponentialRampToValueAtTime(0.001, tStart + dur);
+
+                osc.connect(lp);
+                lp.connect(gNode);
+                gNode.connect(ctx.destination);
+
+                osc.start(tStart);
+                osc.stop(tStart + dur + 0.01);
+            });
+        };
+
+        const cadence = [
+            { t: 0.05, hz: 58, gain: 0.34 },
+            { t: 0.65, hz: 62, gain: 0.36 },
+            { t: 1.18, hz: 66, gain: 0.38 },
+            { t: 1.66, hz: 70, gain: 0.40 },
+            { t: 2.08, hz: 74, gain: 0.42 },
+            { t: 2.44, hz: 78, gain: 0.45 },
+            { t: 2.74, hz: 82, gain: 0.48 }
+        ];
+
+        cadence.forEach(item => hitBeat(item.t, item.hz, item.gain));
+    } else if (type === 'select') {
         playTone(440, now, 0.18, 'triangle', 0.15);
         playTone(554.37, now + 0.12, 0.25, 'triangle', 0.12);
     } else if (type === 'correct') {
@@ -2189,6 +2262,7 @@ function shuffleArray(arr) {
 }
 
 function startNewGame() {
+    getAudioCtx();
     const playerName = document.getElementById('playerNameInput').value.trim();
     if (!playerName) {
         showToast(t('toastEnterPlayerName'), 'fa-user-pen');
@@ -2269,6 +2343,7 @@ function startGameTimer() {
         if (!appState.game.isLocked && appState.game.active) {
             appState.game.seconds++;
             document.getElementById('gameTimerDisplay').textContent = `${appState.game.seconds}s`;
+            playSoundEffect('tick');
         }
     }, 1000);
 }
@@ -2379,6 +2454,7 @@ function selectAnswer(idx) {
     g.isLocked = true;
 
     playSoundEffect('select');
+    playSoundEffect('suspense');
 
     for (let i = 0; i < 4; i++) {
         document.getElementById(`ansBtn${i}`).disabled = true;
@@ -2421,7 +2497,7 @@ function selectAnswer(idx) {
 
             setTimeout(() => finishGameSession('wrong'), 1800);
         }
-    }, 1100);
+    }, 4000);
 }
 
 function advanceAfterCorrect() {
