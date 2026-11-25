@@ -642,28 +642,28 @@ function playSoundEffect(type) {
         osc.start(t0);
         osc.stop(t0 + dur + 0.004);
     } else if (type === 'suspense') {
-        // Latido grave "pum-pum" con tensión creciente en ~3s antes del veredicto
+        // Latido grave "pum-pum" con mayor volumen y tensión creciente
         const hitBeat = (offsetSec, baseHz, peakGain) => {
-            const pumOffsets = [0.0, 0.14];
+            const pumOffsets = [0.0, 0.175];
             pumOffsets.forEach((rel, idx) => {
                 const tStart = now + offsetSec + rel;
-                const dur = 0.085;
-                const amp = idx === 0 ? peakGain : peakGain * 0.78;
+                const dur = 0.115;
+                const amp = Math.min(0.95, idx === 0 ? peakGain : peakGain * 0.85);
 
                 const osc = ctx.createOscillator();
                 const lp = ctx.createBiquadFilter();
                 const gNode = ctx.createGain();
 
                 osc.type = idx === 0 ? 'triangle' : 'sine';
-                osc.frequency.setValueAtTime(baseHz * 1.45, tStart);
-                osc.frequency.exponentialRampToValueAtTime(Math.max(38, baseHz * 0.62), tStart + dur);
+                osc.frequency.setValueAtTime(baseHz * 1.35, tStart);
+                osc.frequency.exponentialRampToValueAtTime(Math.max(32, baseHz * 0.52), tStart + dur);
 
                 lp.type = 'lowpass';
-                lp.frequency.setValueAtTime(190, tStart);
-                lp.Q.setValueAtTime(1.4, tStart);
+                lp.frequency.setValueAtTime(165, tStart);
+                lp.Q.setValueAtTime(1.8, tStart);
 
                 gNode.gain.setValueAtTime(0.001, tStart);
-                gNode.gain.linearRampToValueAtTime(amp, tStart + 0.005);
+                gNode.gain.linearRampToValueAtTime(amp, tStart + 0.006);
                 gNode.gain.exponentialRampToValueAtTime(0.001, tStart + dur);
 
                 osc.connect(lp);
@@ -671,18 +671,17 @@ function playSoundEffect(type) {
                 gNode.connect(ctx.destination);
 
                 osc.start(tStart);
-                osc.stop(tStart + dur + 0.01);
+                osc.stop(tStart + dur + 0.015);
             });
         };
 
         const cadence = [
-            { t: 0.05, hz: 58, gain: 0.34 },
-            { t: 0.65, hz: 62, gain: 0.36 },
-            { t: 1.18, hz: 66, gain: 0.38 },
-            { t: 1.66, hz: 70, gain: 0.40 },
-            { t: 2.08, hz: 74, gain: 0.42 },
-            { t: 2.44, hz: 78, gain: 0.45 },
-            { t: 2.74, hz: 82, gain: 0.48 }
+            { t: 0.05, hz: 42, gain: 0.65 },
+            { t: 0.78, hz: 44, gain: 0.70 },
+            { t: 1.44, hz: 47, gain: 0.75 },
+            { t: 2.02, hz: 50, gain: 0.80 },
+            { t: 2.52, hz: 53, gain: 0.85 },
+            { t: 2.94, hz: 56, gain: 0.92 }
         ];
 
         cadence.forEach(item => hitBeat(item.t, item.hz, item.gain));
