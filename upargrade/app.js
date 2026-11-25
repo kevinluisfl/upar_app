@@ -92,9 +92,9 @@ const I18N = {
         statBlank: 'En Blanco / Doble',
         statPct: 'Porcentaje',
         labelStudentName: 'Nombre del Estudiante',
-        placeholderStudentName: 'Ej. Caroll Lopez - 601',
+        placeholderStudentName: 'Ej. Caroll Lopez',
         labelStudentCode: 'Código / Documento (Opcional)',
-        placeholderStudentCode: 'Ej. 106599...',
+        placeholderStudentCode: 'Ej. 106543...',
         btnSaveGrade: 'Registrar Calificación en Planilla',
         auditTitle: 'Revisión y Corrección Rápida por Pregunta',
         auditHint: '(Haz clic en una letra si deseas ajustar manualmente lo detectado)',
@@ -233,9 +233,9 @@ const I18N = {
         statBlank: 'Blank / Double',
         statPct: 'Percentage',
         labelStudentName: 'Student Name',
-        placeholderStudentName: 'E.g. Caroll Lopez - 601',
+        placeholderStudentName: 'E.g. Caroll Lopez',
         labelStudentCode: 'Student ID (Optional)',
-        placeholderStudentCode: 'E.g. 106599...',
+        placeholderStudentCode: 'E.g. 106543...',
         btnSaveGrade: 'Save Grade to Gradebook',
         auditTitle: 'Quick Question-by-Question Review & Override',
         auditHint: '(Click any bubble below to manually adjust the detected answer)',
@@ -370,9 +370,8 @@ function selectStudentFromRoster(selectedName) {
     const nameInput = document.getElementById('scannedStudentName');
     const course = appState.activeExam?.course || '';
     if (!nameInput) return;
-    nameInput.value = course && !selectedName.toLowerCase().includes(course.toLowerCase())
-        ? `${selectedName} - ${course}`
-        : selectedName;
+    // nameInput.value = course && !selectedName.toLowerCase().includes(course.toLowerCase()) ? `${selectedName} - ${course}` : selectedName;
+    nameInput.value = selectedName;
 }
 
 const ROSTER_AUTO_REMOVE_KEY = 'upargrade_roster_auto_remove_v1';
@@ -1742,7 +1741,8 @@ function generateSimulatedStudentScan() {
     drawReferenceSheetOnScannerCanvas(true);
     const names = ['Caroll Lopez', 'Sofía Martínez', 'Luis Fernando Ríos', 'Daniela Gómez', 'Mateo Vargas'];
     const randomName = names[Math.floor(Math.random() * names.length)];
-    document.getElementById('scannedStudentName').value = `${randomName} - ${appState.activeExam.course}`;
+    // document.getElementById('scannedStudentName').value = `${randomName} - ${appState.activeExam.course}`;
+    document.getElementById('scannedStudentName').value = `${randomName}`;
     extractStudentNameStripFromAlignedCanvas();
     showToast(t('toastScanComplete'), 'fa-wand-magic-sparkles');
 }
@@ -3085,9 +3085,8 @@ async function runHandwritingOcrOnCrop() {
             .trim();
 
         if (cleaned.length >= 2) {
-            nameInput.value = ex.course && !cleaned.toLowerCase().includes(ex.course.toLowerCase())
-                ? `${cleaned} - ${ex.course}`
-                : cleaned;
+            // nameInput.value = ex.course && !cleaned.toLowerCase().includes(ex.course.toLowerCase()) ? `${cleaned} - ${ex.course}`: cleaned;
+            nameInput.value = cleaned;
             showToast(`Nombre detectado: ${nameInput.value}`, 'fa-user-check');
         } else {
             nameInput.focus();
@@ -3109,10 +3108,10 @@ function saveScannedResultToGradebook() {
     }
 
     const ex = appState.activeExam;
-    // Si el nombre escrito no incluye ya el grado/curso, anexarlo automáticamente
-    if (ex.course && !studentName.toLowerCase().includes(ex.course.toLowerCase())) {
-        studentName = `${studentName} - ${ex.course}`;
-    }
+    // * // Si el nombre escrito no incluye ya el grado/curso, anexarlo automáticamente (ANTES, ya no)
+    // if (ex.course && !studentName.toLowerCase().includes(ex.course.toLowerCase())) {
+    //     studentName = `${studentName} - ${ex.course}`;
+    // }
 
     const studentCode = document.getElementById('scannedStudentId').value.trim() || '---';
     const detected = appState.scanner.detectedAnswers;
