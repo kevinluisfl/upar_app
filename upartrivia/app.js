@@ -2098,18 +2098,40 @@ function deleteBank(bankId) {
 }
 
 function restoreDefaultBanks() {
-    DEFAULT_BANKS.forEach(def => {
-        if (!appState.banks.some(b => b.title.toLowerCase() === def.title.toLowerCase())) {
-            appState.banks.push({
-                ...JSON.parse(JSON.stringify(def)),
-                teacher: appState.activeTeacher
-            });
-        }
+    const isEn = appState.lang === 'en';
+    const customBanksCount = appState.banks.length;
+
+    const title = isEn ? 'Restore default templates?' : '¿Restaurar plantillas precargadas?';
+    const bodyHtml = isEn
+        ? `This will remove your current <strong>${customBanksCount}</strong> question bank(s) and load the preloaded sample banks instead. Do you want to continue?`
+        : `Esto eliminará los <strong>${customBanksCount}</strong> banco(s) de preguntas que tienes actualmente y cargará en su lugar los bancos precargados de ejemplo. ¿Deseas continuar?`;
+    const confirmLabel = isEn ? 'Yes, Restore Templates' : 'Sí, Restaurar Plantillas';
+
+    showAppModal({
+        icon: 'fa-rotate-left',
+        title,
+        bodyHtml,
+        buttons: [
+            { label: t('btnCancel'), className: 'btn-utility' },
+            {
+                label: confirmLabel,
+                className: 'btn-danger-sm',
+                onClick: () => {
+                    appState.banks = DEFAULT_BANKS.map(def => ({
+                        ...JSON.parse(JSON.stringify(def)),
+                        teacher: appState.activeTeacher,
+                        createdAt: new Date().toISOString().slice(0, 10)
+                    }));
+                    saveBanksToStorage();
+                    banksCurrentPage = 1;
+                    renderBanksList();
+                    updateLobbySelectors();
+                    handleBulkModeChange();
+                    showToast(t('toastDefaultsRestored'), 'fa-rotate-left');
+                }
+            }
+        ]
     });
-    saveBanksToStorage();
-    renderBanksList();
-    updateLobbySelectors();
-    showToast(t('toastDefaultsRestored'));
 }
 
 function openEditBankModal(bankId) {
@@ -3133,18 +3155,21 @@ function drawTriviaQrCanvas(containerEl, textData) {
 function connectTriviaPeer(peerId, mode, statusEl, onDoneFn) {
     const isEn = appState.lang === 'en';
     if (statusEl) {
-        statusEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-indigo"></i> ${isEn ? 'Linking devices...' : 'Enlazando dispositivos...'}`;
+        statusEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-indigo"></i> ${isEn ? 'Linking devices (4G/Wi-Fi)...' : 'Enlazando dispositivos (4G/Wi-Fi)...'}`;
     }
 
     cleanupTriviaQrResources();
-    triviaQrPeer = new window.Peer({ config: TRIVIA_PEER_ICE });
+    triviaQrPeer = new window.Peer({
+        config: TRIVIA_PEER_ICE,
+        debug: 0
+    });
 
     let done = false;
     const timer = setTimeout(() => {
         if (!done && statusEl) {
-            statusEl.textContent = isEn ? 'Connection timed out. Scan again.' : 'Tiempo agotado. Verifica que el otro QR siga abierto e intenta de nuevo.';
+            statusEl.innerHTML = `<span class="text-amber">${isEn ? 'Connection timed out. Scan again.' : 'Tiempo agotado. Verifica que el QR del PC siga abierto, intenta de nuevo o usa Exportar/Importar JSON.'}</span>`;
         }
-    }, 14000);
+    }, 22000);
 
     triviaQrPeer.on('open', () => {
         const conn = triviaQrPeer.connect(peerId, {
@@ -3172,16 +3197,25 @@ function connectTriviaPeer(peerId, mode, statusEl, onDoneFn) {
             } else if (msg && msg.type === 'TRIVIA_ACK') {
                 done = true;
                 clearTimeout(timer);
-                showToast(isEn ? 'Trivia data sent successfully!' : '¡Datos de trivia enviados correctamente!');
+                showToast(isEn ? 'Trivia data sent!' : '¡Datos de trivia enviados correctamente!');
                 cleanupTriviaQrResources();
                 if (onDoneFn) onDoneFn();
             }
         });
 
         conn.on('error', () => {
+            if (done) return;
             clearTimeout(timer);
             if (statusEl) statusEl.textContent = isEn ? 'Transfer error.' : 'Error en la transferencia.';
         });
+    });
+
+    triviaQrPeer.on('error', () => {
+        if (done) return;
+        clearTimeout(timer);
+        if (statusEl) {
+            statusEl.textContent = isEn ? 'Peer connection error. Try again.' : 'No se pudo enlazar con el otro dispositivo. Intenta de nuevo.';
+        }
     });
 }
 
