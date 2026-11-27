@@ -3034,10 +3034,10 @@ function extractStudentNameStripFromAlignedCanvas() {
         const nameY = Math.max(sepY + Math.round(22 * s), Math.round(geom.startY - 12 * s));
         const gradeBlockW = Math.round(86 * s);
 
-        sx = Math.round(mx + 46 * s);
-        sy = Math.max(2, Math.round(nameY - 16 * s));
-        sw = Math.max(80, Math.round(innerW - gradeBlockW - 62 * s));
-        sh = Math.max(18, Math.round(24 * s));
+        sx = Math.max(2, Math.round(mx - 4 * s));
+        sy = Math.max(2, Math.round(sepY + 2 * s));
+        sw = Math.max(90, Math.round(innerW - gradeBlockW - 8 * s));
+        sh = Math.max(24, Math.round((nameY + 10 * s) - sy));
     } else {
         const boxTop = Math.round(34 * s);
         const boxH = Math.round(52 * s);
@@ -3048,10 +3048,10 @@ function extractStudentNameStripFromAlignedCanvas() {
         const usableStW = innerW - padIn * 2 - colGapSt * 2;
         const wCol1 = Math.floor(usableStW * 0.52);
 
-        sx = Math.round(mx + padIn);
-        sy = Math.round(stTop + 14 * s);
-        sw = Math.max(80, wCol1);
-        sh = Math.max(18, Math.round(stH - 16 * s));
+        sx = Math.max(2, Math.round(mx + padIn - 4 * s));
+        sy = Math.max(2, Math.round(stTop + 2 * s));
+        sw = Math.max(90, Math.round(wCol1 + 12 * s));
+        sh = Math.max(24, Math.round(stH - 4 * s));
     }
 
     sx = Math.max(0, Math.min(W - 1, sx));
@@ -3071,7 +3071,6 @@ function extractStudentNameStripFromAlignedCanvas() {
     const dy = Math.round((cropCanvas.height - dh) / 2);
 
     ctx.drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh);
-    enhanceSheetContrast(cropCanvas);
 }
 
 async function runHandwritingOcrOnCrop() {
@@ -3087,7 +3086,6 @@ async function runHandwritingOcrOnCrop() {
     try {
         await loadScriptOnce('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js', 'Tesseract');
 
-        // Trabajar sobre un canvas temporal para NO borrar ni alterar el recorte visible en pantalla
         const ocrCanvas = document.createElement('canvas');
         const scale = 2;
         ocrCanvas.width = cropCanvas.width * scale;
@@ -3117,6 +3115,7 @@ async function runHandwritingOcrOnCrop() {
 
         const cleaned = rawText
             .replace(/NOMBRE\s*(COMPLETO)?\s*(DEL)?\s*(ESTUDIANTE)?\s*[:.]?/gi, '')
+            .replace(/\bNOMBRE\b\s*[:.]?/gi, '')
             .replace(/\bNOTA\b\s*[:.]?/gi, '')
             .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, ' ')
             .replace(/\s+/g, ' ')
