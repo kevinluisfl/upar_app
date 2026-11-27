@@ -1380,11 +1380,11 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
         ctx.strokeRect(mx, stTop, innerW, stH);
 
         const padIn = Math.round(10 * s);
-        const colGapSt = Math.round(12 * s);
+        const colGapSt = Math.round(10 * s);
         const usableStW = innerW - padIn * 2 - colGapSt * 2;
-        const wCol1 = Math.floor(usableStW * 0.52);
         const wCol2 = Math.floor(usableStW * 0.24);
-        const wCol3 = usableStW - wCol1 - wCol2;
+        const wCol3 = Math.floor(usableStW * 0.12);
+        const wCol1 = usableStW - wCol2 - wCol3;
 
         const xCol1 = mx + padIn;
         const xCol2 = xCol1 + wCol1 + colGapSt;
@@ -3086,33 +3086,51 @@ async function runHandwritingOcrOnCrop() {
 
     try {
         await loadScriptOnce('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js', 'Tesseract');
-        const cCtx = cropCanvas.getContext('2d');
-        const cImg = cCtx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
-        const cd = cImg.data;
-        for (let i = 0; i < cd.length; i += 4) {
-            const luma = 0.299 * cd[i] + 0.587 * cd[i + 1] + 0.114 * cd[i + 2];
-            const boosted = luma < 185 ? Math.max(0, (luma - 185) * 2.2 + 185) : 255;
-            const v = Math.max(0, Math.min(255, boosted));
-            cd[i] = v;
-            cd[i + 1] = v;
-            cd[i + 2] = v;
+
+        // Trabajar sobre un canvas temporal para NO borrar ni alterar el recorte visible en pantalla
+        const ocrCanvas = document.createElement('canvas');
+        const scale = 2;
+        ocrCanvas.width = cropCanvas.width * scale;
+        ocrCanvas.height = cropCanvas.height * scale;
+        const oCtx = ocrCanvas.getContext('2d');
+        oCtx.fillStyle = '#ffffff';
+        oCtx.fillRect(0, 0, ocrCanvas.width, ocrCanvas.height);
+        oCtx.drawImage(cropCanvas, 0, 0, ocrCanvas.width, ocrCanvas.height);
+
+        const imgData = oCtx.getImageData(0, 0, ocrCanvas.width, ocrCanvas.height);
+        const data = imgData.data;
+        const factor = 1.35;
+        const intercept = 128 * (1 - factor);
+
+        for (let i = 0; i < data.length; i += 4) {
+            const luma = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            const softEnhanced = Math.max(0, Math.min(255, luma * factor + intercept));
+            data[i] = softEnhanced;
+            data[i + 1] = softEnhanced;
+            data[i + 2] = softEnhanced;
         }
-        cCtx.putImageData(cImg, 0, 0);
-        const { data: { text } } = await window.Tesseract.recognize(cropCanvas, 'spa');
-        const cleaned = (text || '')
+        oCtx.putImageData(imgData, 0, 0);
+
+        const { data: result } = await window.Tesseract.recognize(ocrCanvas, 'spa');
+        const rawText = result?.text || '';
+        const confidence = typeof result?.confidence === 'number' ? result.confidence : 0;
+
+        const cleaned = rawText
             .replace(/NOMBRE\s*(COMPLETO)?\s*(DEL)?\s*(ESTUDIANTE)?\s*[:.]?/gi, '')
             .replace(/\bNOTA\b\s*[:.]?/gi, '')
             .replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
 
-        if (cleaned.length >= 2) {
-            // nameInput.value = ex.course && !cleaned.toLowerCase().includes(ex.course.toLowerCase()) ? `${cleaned} - ${ex.course}`: cleaned;
+        const words = cleaned.split(' ').filter(w => w.length >= 2);
+        const looksPlausibleName = confidence >= 55 && words.length >= 1 && words.length <= 5 && cleaned.length >= 3;
+
+        if (looksPlausibleName) {
             nameInput.value = cleaned;
             showToast(`Nombre detectado: ${nameInput.value}`, 'fa-user-check');
         } else {
             nameInput.focus();
-            showToast('Texto manuscrito muy tenue. Puedes escribirlo mirando el recorte arriba.', 'fa-pen');
+            showToast('Caligrafía difícil para OCR. Elige de la lista base o escríbelo mirando el recorte.', 'fa-pen');
         }
     } catch (e) {
         showToast('No se pudo cargar el motor OCR.', 'fa-circle-exclamation');
