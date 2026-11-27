@@ -3123,6 +3123,107 @@ function drawPuzzleQrCanvas(containerEl, textData) {
     containerEl.appendChild(canvas);
 }
 
+function openPuzzleActivitySelectionModal(activitiesList, onConfirm) {
+    const isEn = currentLang === 'en';
+    const list = Array.isArray(activitiesList) ? activitiesList : [];
+
+    if (list.length === 0) {
+        onConfirm([]);
+        return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print';
+
+    const itemsHtml = list.map((act, idx) => {
+        const name = String(act.name || act.title || t('untitledPuzzle'))
+            .replace(/</g, '<')
+            .replace(/>/g, '>');
+        const count = Array.isArray(act.items) ? act.items.length : 0;
+        const wordLabel = count === 1 ? t('wordSingle') : t('wordPlural');
+        const modeLabel = act.mode === 'crossword' ? t('tabCW') : t('tabWS');
+        return `
+            <label class="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/70 cursor-pointer text-left">
+                <span class="flex items-center gap-2.5 flex-1 min-w-0">
+                    <input type="checkbox" class="puzzle-qr-act-chk w-4 h-4 cursor-pointer" data-act-idx="${idx}" checked>
+                    <span class="min-w-0">
+                        <strong class="block text-xs text-slate-800 dark:text-slate-100 truncate">${name}</strong>
+                        <small class="text-[11px] text-slate-500 dark:text-slate-400">${modeLabel} • ${count} ${wordLabel}</small>
+                    </span>
+                </span>
+            </label>
+        `;
+    }).join('');
+
+    overlay.innerHTML = `
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-4 shadow-xl space-y-3">
+            <h3 class="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-list-check text-indigo-500"></i>
+                <span>${isEn ? 'Select Activities (All or Choose)' : 'Seleccionar Actividades (Todas o Cuáles)'}</span>
+            </h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+                ${isEn
+                    ? 'All activities are selected by default. Uncheck or choose which ones to transfer:'
+                    : 'Todas vienen seleccionadas por defecto. Desmarca o elige cuáles deseas transferir:'}
+            </p>
+            <div class="flex items-center justify-between gap-2">
+                <button type="button" id="btnPuzzleToggleAllActs" class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    ${isEn ? 'Unselect all' : 'Deseleccionar todas'}
+                </button>
+                <span id="puzzleSelectedActsCount" class="text-xs font-bold text-slate-600 dark:text-slate-300">
+                    ${list.length} / ${list.length}
+                </span>
+            </div>
+            <div class="max-h-56 overflow-y-auto space-y-1.5">
+                ${itemsHtml}
+            </div>
+            <div class="flex justify-end gap-2 pt-1">
+                <button type="button" id="btnCancelPuzzleActPick" class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
+                    ${isEn ? 'Cancel' : 'Cancelar'}
+                </button>
+                <button type="button" id="btnConfirmPuzzleActPick" class="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold">
+                    ${isEn ? 'Continue' : 'Continuar'}
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const checks = Array.from(overlay.querySelectorAll('.puzzle-qr-act-chk'));
+    const countEl = overlay.querySelector('#puzzleSelectedActsCount');
+    const btnToggle = overlay.querySelector('#btnPuzzleToggleAllActs');
+    const btnConfirm = overlay.querySelector('#btnConfirmPuzzleActPick');
+
+    const refreshState = () => {
+        const n = checks.filter(c => c.checked).length;
+        countEl.textContent = `${n} / ${checks.length}`;
+        btnConfirm.disabled = n === 0;
+        const all = n === checks.length;
+        btnToggle.textContent = all
+            ? (isEn ? 'Unselect all' : 'Deseleccionar todas')
+            : (isEn ? 'Select all' : 'Seleccionar todas');
+    };
+
+    checks.forEach(c => c.addEventListener('change', refreshState));
+    btnToggle.onclick = () => {
+        const all = checks.every(c => c.checked);
+        checks.forEach(c => { c.checked = !all; });
+        refreshState();
+    };
+    overlay.querySelector('#btnCancelPuzzleActPick').onclick = () => {
+        overlay.remove();
+        onConfirm(null);
+    };
+    btnConfirm.onclick = () => {
+        const chosen = checks
+            .filter(c => c.checked)
+            .map(c => list[Number(c.dataset.actIdx)])
+            .filter(Boolean);
+        overlay.remove();
+        onConfirm(chosen);
+    };
+}
+
 function connectPuzzlePeer(peerId, mode, statusEl, onDoneFn) {
     const isEn = currentLang === 'en';
     if (statusEl) {
@@ -3147,8 +3248,26 @@ function connectPuzzlePeer(peerId, mode, statusEl, onDoneFn) {
 
         conn.on('open', () => {
             if (mode === 'PUZZLE_P2P_RECEIVE') {
-                if (statusEl) statusEl.textContent = isEn ? 'Sending activities...' : 'Enviando actividades...';
-                conn.send({ type: 'PUZZLE_DATA_BUNDLE', payload: getPuzzleBundleForSync() });
+                const fullBundle = getPuzzleBundleForSync();
+                const candidates = Array.isArray(fullBundle.savedActivities) && fullBundle.savedActivities.length > 0
+                    ? fullBundle.savedActivities
+                    : (fullBundle.currentActivity ? [fullBundle.currentActivity] : []);
+
+                openPuzzleActivitySelectionModal(candidates, (chosenActs) => {
+                    if (!Array.isArray(chosenActs)) {
+                        if (statusEl) statusEl.textContent = isEn ? 'Send cancelled.' : 'Envío cancelado.';
+                        return;
+                    }
+                    if (statusEl) statusEl.textContent = isEn ? 'Sending selected activities...' : 'Enviando actividades seleccionadas...';
+                    conn.send({
+                        type: 'PUZZLE_DATA_BUNDLE',
+                        payload: {
+                            ...fullBundle,
+                            currentActivity: chosenActs[0] || null,
+                            savedActivities: chosenActs
+                        }
+                    });
+                });
             } else {
                 if (statusEl) statusEl.textContent = isEn ? 'Requesting activities...' : 'Solicitando actividades...';
                 conn.send({ type: 'PUZZLE_REQUEST_BUNDLE' });
@@ -3161,7 +3280,19 @@ function connectPuzzlePeer(peerId, mode, statusEl, onDoneFn) {
                 clearTimeout(timer);
                 cleanupPuzzleQrResources();
                 if (onDoneFn) onDoneFn();
-                applyPuzzleQrBundle(msg.payload);
+
+                const incomingActs = Array.isArray(msg.payload.savedActivities) && msg.payload.savedActivities.length > 0
+                    ? msg.payload.savedActivities
+                    : (msg.payload.currentActivity ? [msg.payload.currentActivity] : []);
+
+                openPuzzleActivitySelectionModal(incomingActs, (chosenActs) => {
+                    if (!Array.isArray(chosenActs) || chosenActs.length === 0) return;
+                    applyPuzzleQrBundle({
+                        ...msg.payload,
+                        currentActivity: chosenActs[0],
+                        savedActivities: chosenActs
+                    });
+                });
             } else if (msg && msg.type === 'PUZZLE_ACK') {
                 done = true;
                 clearTimeout(timer);
@@ -3329,7 +3460,27 @@ async function openPuzzleQrSyncModal() {
                     if (msg && msg.type === 'PUZZLE_DATA_BUNDLE' && msg.payload) {
                         conn.send({ type: 'PUZZLE_ACK' });
                         closeModal();
-                        applyPuzzleQrBundle(msg.payload);
+                        // applyPuzzleQrBundle(msg.payload);
+
+                        conn.on('data', (msg) => {
+                            if (msg && msg.type === 'PUZZLE_DATA_BUNDLE' && msg.payload) {
+                                conn.send({ type: 'PUZZLE_ACK' });
+                                closeModal();
+                                const incomingActs = Array.isArray(msg.payload.savedActivities) && msg.payload.savedActivities.length > 0
+                                    ? msg.payload.savedActivities
+                                    : (msg.payload.currentActivity ? [msg.payload.currentActivity] : []);
+
+                                openPuzzleActivitySelectionModal(incomingActs, (chosenActs) => {
+                                    if (!Array.isArray(chosenActs) || chosenActs.length === 0) return;
+                                    applyPuzzleQrBundle({
+                                        ...msg.payload,
+                                        currentActivity: chosenActs[0],
+                                        savedActivities: chosenActs
+                                    });
+                                });
+                            }
+                        });
+                        
                     }
                 });
             });
