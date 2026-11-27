@@ -2682,43 +2682,136 @@ function finishGameSession(reason) {
 /* --------------------------------------------------------------------------
    10. SISTEMA DE RANKING (PODIO LIMPIO SIN #1,#2,#3 Y NUMERACIÓN DESDE #4)
    -------------------------------------------------------------------------- */
+let triviaRankingSort = { key: 'score', dir: 'desc' }; // 'player' | 'topic' | 'teacher' | 'round' | 'score' | 'time' | 'date'
+
+function toggleTriviaRankingSort(key) {
+    if (triviaRankingSort.key === key) {
+        triviaRankingSort.dir = triviaRankingSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        triviaRankingSort.key = key;
+        triviaRankingSort.dir = (key === 'score') ? 'desc' : 'asc';
+    }
+    renderRankingTable();
+}
+
+function deleteSingleRankingEntry(entrySnapshot) {
+    if (!entrySnapshot) return;
+
+    const isEn = appState.lang === 'en';
+    const safePlayer = String(entrySnapshot.player || '').replace(/</g, '<').replace(/>/g, '>');
+    const safeTopic = String(entrySnapshot.topic || '').replace(/</g, '<').replace(/>/g, '>');
+    const scoreFormatted = `${Number(entrySnapshot.score || 0).toLocaleString()} pts`;
+
+    const title = isEn ? 'Delete ranking record?' : '¿Eliminar registro del ranking?';
+    const bodyHtml = isEn
+        ? `Are you sure you want to delete the score record for <strong>${safePlayer}</strong> in <strong>${safeTopic}</strong> (<strong>${scoreFormatted}</strong>)?`
+        : `¿Seguro que deseas eliminar el registro de <strong>${safePlayer}</strong> en <strong>${safeTopic}</strong> (<strong>${scoreFormatted}</strong>)?`;
+    const confirmLabel = isEn ? 'Yes, Delete Record' : 'Sí, Eliminar Registro';
+
+    showAppModal({
+        icon: 'fa-trash-can',
+        title,
+        bodyHtml,
+        buttons: [
+            { label: t('btnCancel'), className: 'btn-utility' },
+            {
+                label: confirmLabel,
+                className: 'btn-danger-sm',
+                onClick: () => {
+                    const idx = appState.ranking.findIndex(r =>
+                        r.player === entrySnapshot.player &&
+                        r.topic === entrySnapshot.topic &&
+                        r.teacher === entrySnapshot.teacher &&
+                        Number(r.score) === Number(entrySnapshot.score) &&
+                        Number(r.time) === Number(entrySnapshot.time) &&
+                        r.date === entrySnapshot.date
+                    );
+                    if (idx === -1) return;
+                    appState.ranking.splice(idx, 1);
+                    saveRankingToStorage();
+                    renderRankingTable();
+                    showToast(isEn ? 'Record deleted' : 'Registro eliminado', 'fa-trash-can');
+                }
+            }
+        ]
+    });
+}
+
 function renderRankingTable() {
     const bankFilter = document.getElementById('rankingBankFilter');
     const teacherFilter = document.getElementById('rankingTeacherFilter');
-    if (!bankFilter || !teacherFilter) return;
+    const tbody = document.getElementById('rankingTableBody');
+    if (!tbody) return;
 
     const searchVal = (document.getElementById('rankingSearchInput')?.value || '').trim().toLowerCase();
-
-    const currentTopic = bankFilter.value || 'all';
-    const currentTeacher = teacherFilter.value || 'all';
+    const currentTopic = bankFilter?.value || 'all';
+    const currentTeacher = teacherFilter?.value || 'all';
 
     const uniqueTopics = [...new Set(appState.ranking.map(r => r.topic))];
     const uniqueTeachers = [...new Set(appState.ranking.map(r => r.teacher))];
 
-    bankFilter.innerHTML = `<option value="all">${t('filterAllTopics')}</option>` +
-        uniqueTopics.map(tp => `<option value="${tp}" ${tp === currentTopic ? 'selected' : ''}>${tp}</option>`).join('');
+    if (bankFilter) {
+        bankFilter.innerHTML = `<option value="all">${t('filterAllTopics')}</option>` +
+            uniqueTopics.map(tp => `<option value="${tp}" ${tp === currentTopic ? 'selected' : ''}>${tp}</option>`).join('');
+    }
+    if (teacherFilter) {
+        teacherFilter.innerHTML = `<option value="all">${t('filterAllTeachers')}</option>` +
+            uniqueTeachers.map(tc => `<option value="${tc}" ${tc === currentTeacher ? 'selected' : ''}>${tc}</option>`).join('');
+    }
 
-    teacherFilter.innerHTML = `<option value="all">${t('filterAllTeachers')}</option>` +
-        uniqueTeachers.map(tc => `<option value="${tc}" ${tc === currentTeacher ? 'selected' : ''}>${tc}</option>`).join('');
+    const tableEl = tbody.closest('table');
+    const thead = tableEl?.querySelector('thead');
+    if (thead) {
+        const sortIcon = (k) => triviaRankingSort.key === k
+            ? (triviaRankingSort.dir === 'asc' ? ' ▲' : ' ▼')
+            : ' ⇅';
+
+        thead.innerHTML = `
+            <tr>
+                <th>#</th>
+                <th><button type="button" class="btn-mini" onclick="toggleTriviaRankingSort('player')">${t('thPlayer')}<span>${sortIcon('player')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleTriviaRankingSort('topic')">${t('thTopic')}<span>${sortIcon('topic')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleTriviaRankingSort('teacher')">${t('thTeacher')}<span>${sortIcon('teacher')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleTriviaRankingSort('round')">${t('thRound')}<span>${sortIcon('round')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleTriviaRankingSort('score')">${t('thScore')}<span>${sortIcon('score')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleTriviaRankingSort('time')">${t('thTime')}<span>${sortIcon('time')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleTriviaRankingSort('date')">${t('thDate')}<span>${sortIcon('date')}</span></button></th>
+                <th>${appState.lang === 'en' ? 'Action' : 'Acción'}</th>
+            </tr>
+        `;
+    }
 
     const filtered = appState.ranking
         .filter(r => (currentTopic === 'all' || r.topic === currentTopic))
         .filter(r => (currentTeacher === 'all' || r.teacher === currentTeacher))
-        .filter(r => (!searchVal || r.player.toLowerCase().includes(searchVal)))
+        .filter(r => (!searchVal || String(r.player || '').toLowerCase().includes(searchVal)))
         .sort((a, b) => {
-            if (b.score !== a.score) return b.score - a.score;
-            return a.time - b.time;
+            const k = triviaRankingSort.key;
+            const dir = triviaRankingSort.dir === 'asc' ? 1 : -1;
+            if (k === 'score' || k === 'time' || k === 'round') {
+                const diff = (Number(a[k]) || 0) - (Number(b[k]) || 0);
+                if (diff !== 0) return diff * dir;
+                return (Number(a.time) || 0) - (Number(b.time) || 0);
+            }
+            return String(a[k] || '').localeCompare(String(b[k] || ''), undefined, { sensitivity: 'base' }) * dir;
         });
 
-    const tbody = document.getElementById('rankingTableBody');
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 2rem; color: var(--text-muted);">${t('emptyRanking')}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 2rem; color: var(--text-muted);">${t('emptyRanking')}</td></tr>`;
         return;
     }
 
+    const medals = ['👑 🥇', '🥈', '🥉'];
     tbody.innerHTML = filtered.map((row, idx) => {
-        const medals = ['👑 🥇', '🥈', '🥉'];
         const posBadge = idx < 3 ? medals[idx] : `#${idx + 1}`;
+        const safePayload = encodeURIComponent(JSON.stringify({
+            player: row.player,
+            topic: row.topic,
+            teacher: row.teacher,
+            score: row.score,
+            time: row.time,
+            date: row.date
+        }));
         return `
             <tr>
                 <td class="font-mono" style="font-size:${idx < 3 ? '1.15rem' : '0.84rem'};"><strong>${posBadge}</strong></td>
@@ -2729,6 +2822,11 @@ function renderRankingTable() {
                 <td class="font-mono text-emerald"><strong>${Number(row.score).toLocaleString()} pts</strong></td>
                 <td class="font-mono">${row.time}s</td>
                 <td style="font-size:0.75rem; color:var(--text-muted);">${row.date}</td>
+                <td>
+                    <button type="button" class="btn-icon-sm" onclick="deleteSingleRankingEntry(JSON.parse(decodeURIComponent('${safePayload}')))" title="${appState.lang === 'en' ? 'Delete record' : 'Eliminar registro'}">
+                        <i class="fa-regular fa-trash-can"></i>
+                    </button>
+                </td>
             </tr>
         `;
     }).join('');
@@ -3428,7 +3526,9 @@ Object.assign(window, {
     saveEditedBankChanges,
     onBanksSearchInput,
     goToBanksPage,
-    openTriviaQrSyncModal
+    openTriviaQrSyncModal,
+    toggleTriviaRankingSort,
+    deleteSingleRankingEntry
 });
 
 window.addEventListener('DOMContentLoaded', () => {
