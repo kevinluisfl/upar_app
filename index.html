@@ -119,12 +119,6 @@
                         <span class="only-mobile-label" id="uiMobileThemeText">Tema</span>
                     </button>
 
-                    <!-- Sincronizar por QR -->
-                    <button type="button" class="btn-suite-util" onclick="openSuiteQrSyncModal(); closeMobileActionsMenu();" title="Sincronizar con QR (PC ↔ Celular)">
-                        <i class="fa-solid fa-qrcode text-indigo"></i>
-                        <span id="uiBtnSuiteQr">QR Sync</span>
-                    </button>
-
                     <!-- Respaldo Maestro Unificado JSON -->
                     <button type="button" class="btn-suite-util" onclick="openBackupModal(); closeMobileActionsMenu();" title="Respaldo Maestro de las 4 Apps">
                         <i class="fa-solid fa-database text-indigo"></i>
@@ -172,9 +166,6 @@
                             </button>
                             <button class="btn-hero-outline" onclick="document.getElementById('masterImportInput').click()">
                                 <i class="fa-solid fa-file-import"></i> <span id="uiBtnHeroImport">Importar Todo</span>
-                            </button>
-                            <button type="button" class="btn-hero-outline" onclick="openSuiteQrSyncModal()">
-                                <i class="fa-solid fa-qrcode text-indigo"></i> <span id="uiBtnHeroQr">QR Sync</span>
                             </button>
                             <input type="file" id="masterImportInput" accept=".json" class="hidden" onchange="handleMasterImportJSON(event)">
                         </div>
