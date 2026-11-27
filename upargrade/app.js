@@ -123,7 +123,7 @@ const I18N = {
         emptyGradebook: 'Aún no hay hojas calificadas en esta vista.',
         sheetHeaderTitle: 'HOJA DE RESPUESTAS',
         sheetStudentLabel: 'NOMBRE COMPLETO DEL ESTUDIANTE:',
-        sheetStudentShort: 'Nombre:',
+        sheetStudentShort: 'NOMBRE:',
         sheetDateLabel: 'FECHA:',
         sheetGradeLabel: 'NOTA:',
         sheetInstText: 'Rellene completamente el círculo con lápiz oscuro o bolígrafo negro. No haga tachones ni marcas fuera de los círculos.',
@@ -264,7 +264,7 @@ const I18N = {
         emptyGradebook: 'No graded sheets in this view yet.',
         sheetHeaderTitle: 'ANSWER SHEET',
         sheetStudentLabel: 'STUDENT FULL NAME:',
-        sheetStudentShort: 'Name:',
+        sheetStudentShort: 'NAME:',
         sheetDateLabel: 'DATE:',
         sheetGradeLabel: 'GRADE:',
         sheetInstText: 'Completely fill the circle using a dark pencil or black pen. Avoid stray marks or erasures.',
@@ -461,6 +461,25 @@ function saveExamsToStorage() {
 
 function saveResultsToStorage() {
     localStorage.setItem(STORAGE_KEYS.RESULTS, JSON.stringify(appState.results));
+}
+
+function getDeviceId() {
+    const key = 'upargrade_device_id_v1';
+    let devId = localStorage.getItem(key);
+    if (!devId) {
+        const randPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+        devId = `DEV_${randPart}_${Date.now().toString(36).slice(-4).toUpperCase()}`;
+        localStorage.setItem(key, devId);
+    }
+    return devId;
+}
+
+function generateScopedId(prefix = 'res') {
+    const seqKey = `upargrade_seq_${prefix}_v1`;
+    const nextSeq = (parseInt(localStorage.getItem(seqKey) || '0', 10) || 0) + 1;
+    localStorage.setItem(seqKey, String(nextSeq));
+    const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
+    return `${prefix}_${getDeviceId()}_${nextSeq}_${Date.now().toString(36)}_${rand}`;
 }
 
 function syncCurrentExamMeta() {
@@ -694,7 +713,7 @@ function createNewBlankExam() {
     const savedMin = parseFloat(localStorage.getItem('upargrade_default_min'));
 
     const newEx = {
-        id: 'exam_' + Date.now(),
+        id: generateScopedId('exam'),
         title: 'Nueva Evaluación ICFES',
         course: 'Grado 601',
         questionCount: 20,
@@ -720,7 +739,7 @@ function duplicateExamById(examId) {
     const copySuffix = appState.lang === 'en' ? '(Copy)' : '(Copia)';
     const duplicated = {
         ...JSON.parse(JSON.stringify(source)),
-        id: 'exam_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        id: generateScopedId('exam') + '_' + Math.floor(Math.random() * 1000),
         title: `${source.title} ${copySuffix}`,
         updatedAt: new Date().toISOString().slice(0, 10)
     };
@@ -897,7 +916,7 @@ function renderSavedExamsList() {
                 <p>${ex.course} • ${ex.questionCount} ${t('questionsShort')} (${ex.optionsCount} ${t('optionsShort')}) • ${t('scaleWord')} ${ex.minGrade} - ${ex.maxGrade}</p>
             </div>
             <div style="display:flex; gap:0.35rem;">
-                <button type="button" class="btn-mini" onclick="openQrSyncHubModal()" title="Sincronizar por QR">
+                <button type="button" class="btn-mini" onclick="openSingleExamQrModal('${ex.id}')" title="Enviar solo este examen por QR">
                     <i class="fa-solid fa-qrcode"></i>
                 </button>
                 <button type="button" class="btn-mini" onclick="loadSavedExam('${ex.id}')" title="Abrir">
@@ -1018,25 +1037,25 @@ function buildSingleSheetHTML(ex, showTeacherKey, isMinimal, copiesCount) {
 
     if (isMinimal) {
         return `
-            <div class="icfes-sheet-card minimal-card">
-                <div class="fiducial-mark tl"></div>
-                <div class="fiducial-mark tr"></div>
-                <div class="fiducial-mark bl"></div>
-                <div class="fiducial-mark br"></div>
+            <div class="icfes-sheet-card minimal-card" style="color:#000; font-weight:800;">
+                <div class="fiducial-mark tl" style="background:#000;"></div>
+                <div class="fiducial-mark tr" style="background:#000;"></div>
+                <div class="fiducial-mark bl" style="background:#000;"></div>
+                <div class="fiducial-mark br" style="background:#000;"></div>
 
-                <div class="minimal-header-strip">
-                    <span>${ex.title} (${ex.course})</span>
-                    <div class="sheet-header-right" style="gap:6px;">
-                        <span>${showTeacherKey ? '★ KEY ★' : `${ex.questionCount}Q`}</span>    
+                <div class="minimal-header-strip" style="color:#000; font-weight:900; font-size:0.95rem; border-bottom-width:2px; border-bottom-color:#000;">
+                    <span style="font-weight:900; font-size:0.95rem; color:#000;">${ex.title} (${ex.course})</span>
+                    <div class="sheet-header-right" style="gap:6px; font-weight:900; font-size:0.92rem; color:#000;">
+                        <span style="font-weight:900; font-size:0.92rem; color:#000;">${showTeacherKey ? '★ KEY ★' : `${ex.questionCount}Q`}</span>
                     </div>
                 </div>
 
-                <div class="minimal-name-line" style="margin-top: 4px; gap: 14px;">
-                    <span style="flex:1;">${t('sheetStudentShort')} ___________________________</span>
-                    <span>${t('sheetGradeLabel')} ______</span>
+                <div class="minimal-name-line" style="margin-top: 6px; gap: 14px; color:#000;">
+                    <span style="flex:1; color:#000;"><strong class="minimal-student-lbl" style="font-size:1.05rem; font-weight:900; text-transform:uppercase;">${t('sheetStudentShort')}</strong> ___________________________</span>
+                    <span style="font-weight:900; font-size:1.05rem; color:#000;">${t('sheetGradeLabel')} ______</span>
                 </div>
 
-                <div class="sheet-bubbles-columns" style="grid-template-columns: repeat(${numCols}, 1fr);">
+                <div class="sheet-bubbles-columns minimal-bubbles-bold" style="grid-template-columns: repeat(${numCols}, 1fr);">
                     ${colsHtml}
                 </div>
             </div>
@@ -1264,7 +1283,7 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
         const headerY = fMargin + fSize + Math.round(13 * s);
 
         ctx.fillStyle = '#000000';
-        ctx.font = `800 ${Math.max(10, Math.round(13 * s))}px Inter, sans-serif`;
+        ctx.font = `900 ${Math.max(12, Math.round(15.5 * s))}px Inter, sans-serif`;
         ctx.textBaseline = 'alphabetic';
 
         ctx.textAlign = 'right';
@@ -1280,32 +1299,35 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
 
         const sepY = headerY + Math.round(6 * s);
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = Math.max(1.1, 1.5 * s);
+        ctx.lineWidth = Math.max(1.6, 2.2 * s);
         ctx.beginPath();
         ctx.moveTo(mx, sepY);
         ctx.lineTo(W - mx, sepY);
         ctx.stroke();
 
-        const nameY = Math.max(sepY + Math.round(22 * s), Math.round(geom.startY - 12 * s));
+        const nameY = Math.max(sepY + Math.round(24 * s), Math.round(geom.startY - 12 * s));
         ctx.textAlign = 'left';
-        ctx.font = `700 ${Math.max(8.5, Math.round(11 * s))}px Inter, sans-serif`;
 
-        const nameLbl = `${t('sheetStudentShort')} `;
+        const nameLbl = `${t('sheetStudentShort').toUpperCase()} `;
         const gradeLbl = `${t('sheetGradeLabel')} `;
         const gradeBlockW = Math.round(86 * s);
         const nameBlockEnd = W - mx - gradeBlockW - Math.round(16 * s);
 
+        // 1. Fuente grande 
+        ctx.font = `900 ${Math.max(12, Math.round(15 * s))}px Inter, sans-serif`;
         ctx.fillText(nameLbl, mx, nameY);
-        const nameLineStart = mx + ctx.measureText(nameLbl).width + Math.round(7 * s);
-        ctx.lineWidth = Math.max(0.9, 1.1 * s);
+        const nameLineStart = mx + ctx.measureText(nameLbl).width + Math.round(6 * s);
+
+        ctx.lineWidth = Math.max(1.0, 1.2 * s);
         ctx.beginPath();
         ctx.moveTo(nameLineStart, nameY + Math.round(2 * s));
         ctx.lineTo(nameBlockEnd, nameY + Math.round(2 * s));
         ctx.stroke();
 
+        // ctx.font = `700 ${Math.max(8.5, Math.round(11 * s))}px Inter, sans-serif`;
         const gradeStartX = W - mx - gradeBlockW;
         ctx.fillText(gradeLbl, gradeStartX, nameY);
-        const gradeLineStart = gradeStartX + ctx.measureText(gradeLbl).width + Math.round(7 * s);
+        const gradeLineStart = gradeStartX + ctx.measureText(gradeLbl).width + Math.round(6 * s);
         ctx.beginPath();
         ctx.moveTo(gradeLineStart, nameY + Math.round(2 * s));
         ctx.lineTo(W - mx, nameY + Math.round(2 * s));
@@ -1430,14 +1452,14 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
     for (let c = 0; c < geom.numCols; c++) {
         const colLeft = geom.marginX + c * (geom.colWidth + geom.colGap);
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = Math.max(1.1, 1.3 * s);
+        ctx.lineWidth = isMinimal ? Math.max(1.8, 2.2 * s) : Math.max(1.1, 1.3 * s);
         ctx.strokeRect(colLeft, geom.startY - Math.round(4 * s), geom.colWidth, colBoxH);
     }
 
     for (let q = 1; q <= ex.questionCount; q++) {
         const firstBubble = geom.coords[q]['A'];
         ctx.fillStyle = '#000000';
-        ctx.font = `800 ${Math.max(8, Math.round((isMinimal ? 11 : 12) * s))}px "JetBrains Mono", monospace`;
+        ctx.font = `900 ${Math.max(9.5, Math.round((isMinimal ? 13 : 12) * s))}px "JetBrains Mono", monospace`;
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
         ctx.fillText(String(q).padStart(2, '0'), firstBubble.x - firstBubble.r - Math.round(8 * s), firstBubble.y);
@@ -1450,12 +1472,12 @@ function drawOMRSheetRegion(ctx, ex, offsetX, offsetY, W, H, simulatedAnswers = 
             ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
             ctx.fillStyle = isFilled ? '#0f172a' : '#ffffff';
             ctx.fill();
-            ctx.lineWidth = Math.max(1.2, 1.6 * s);
+            ctx.lineWidth = isMinimal ? Math.max(2.1, 2.6 * s) : Math.max(1.2, 1.6 * s);
             ctx.strokeStyle = '#000000';
             ctx.stroke();
 
             ctx.fillStyle = isFilled ? '#ffffff' : '#000000';
-            ctx.font = `800 ${Math.max(7.5, Math.round(b.r * 0.92))}px "JetBrains Mono", monospace`;
+            ctx.font = `900 ${Math.max(8.5, Math.round(b.r * (isMinimal ? 1.08 : 0.92)))}px "JetBrains Mono", monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(letter, b.x, b.y + 0.5 * s);
@@ -3125,7 +3147,7 @@ function saveScannedResultToGradebook() {
     const finalGrade = ex.minGrade + pct * (ex.maxGrade - ex.minGrade);
 
     appState.results.unshift({
-        id: 'res_' + Date.now(),
+        id: generateScopedId('res'),
         studentName,
         studentCode,
         examId: ex.id,
@@ -3291,19 +3313,65 @@ function getResultExamDisplayLabel(r) {
     return title;
 }
 
+let gradebookSort = { key: 'date', dir: 'desc' }; // 'studentName' | 'studentCode' | 'exam' | 'hits' | 'percentage' | 'grade' | 'date'
+
+function toggleGradebookSort(key) {
+    if (gradebookSort.key === key) {
+        gradebookSort.dir = gradebookSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        gradebookSort.key = key;
+        gradebookSort.dir = (key === 'grade' || key === 'hits' || key === 'percentage') ? 'desc' : 'asc';
+    }
+    renderGradebookTable();
+}
+
 function renderGradebookTable() {
     const filterSel = document.getElementById('resultsExamFilter');
     const searchVal = (document.getElementById('resultsStudentSearch')?.value || '').trim().toLowerCase();
-    if (!filterSel) return;
+    const tbody = document.getElementById('gradebookTableBody');
+    if (!filterSel || !tbody) return;
 
     const currentFilter = filterSel.value || 'all';
     const uniqueExamLabels = [...new Set(appState.results.map(r => getResultExamDisplayLabel(r)))];
     filterSel.innerHTML = `<option value="all">${t('filterAllExams')} (${appState.results.length})</option>` +
         uniqueExamLabels.map(label => `<option value="${label}" ${label === currentFilter ? 'selected' : ''}>${label}</option>`).join('');
 
+    const tableEl = tbody.closest('table');
+    const thead = tableEl?.querySelector('thead');
+    if (thead) {
+        const sortIcon = (k) => gradebookSort.key === k
+            ? (gradebookSort.dir === 'asc' ? ' ▲' : ' ▼')
+            : ' ⇅';
+
+        thead.innerHTML = `
+            <tr>
+                <th>#</th>
+                <th><button type="button" class="btn-mini" onclick="toggleGradebookSort('studentName')">${t('thResStudent')}<span>${sortIcon('studentName')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleGradebookSort('studentCode')">${t('thResCode')}<span>${sortIcon('studentCode')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleGradebookSort('exam')">${t('thResExam')}<span>${sortIcon('exam')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleGradebookSort('hits')">${t('thResHits')}<span>${sortIcon('hits')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleGradebookSort('percentage')">${t('thResPct')}<span>${sortIcon('percentage')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleGradebookSort('grade')">${t('thResGrade')}<span>${sortIcon('grade')}</span></button></th>
+                <th><button type="button" class="btn-mini" onclick="toggleGradebookSort('date')">${t('thResDate')}<span>${sortIcon('date')}</span></button></th>
+                <th>${appState.lang === 'en' ? 'Action' : 'Acción'}</th>
+            </tr>
+        `;
+    }
+
     const filtered = appState.results
         .filter(r => currentFilter === 'all' || getResultExamDisplayLabel(r) === currentFilter)
-        .filter(r => !searchVal || r.studentName.toLowerCase().includes(searchVal) || r.studentCode.toLowerCase().includes(searchVal));
+        .filter(r => !searchVal || String(r.studentName || '').toLowerCase().includes(searchVal) || String(r.studentCode || '').toLowerCase().includes(searchVal))
+        .sort((a, b) => {
+            const k = gradebookSort.key;
+            const dir = gradebookSort.dir === 'asc' ? 1 : -1;
+            if (k === 'grade' || k === 'hits' || k === 'percentage') {
+                return ((Number(a[k]) || 0) - (Number(b[k]) || 0)) * dir;
+            }
+            if (k === 'exam') {
+                return getResultExamDisplayLabel(a).localeCompare(getResultExamDisplayLabel(b), undefined, { sensitivity: 'base' }) * dir;
+            }
+            return String(a[k] || '').localeCompare(String(b[k] || ''), undefined, { sensitivity: 'base' }) * dir;
+        });
 
     const minPassPct = Math.round(getGlobalPassingRatio() * 100);
     updatePassingLabelsUI(minPassPct);
@@ -3319,7 +3387,6 @@ function renderGradebookTable() {
     document.getElementById('kpiPassRate').textContent = `${passRate}%`;
     document.getElementById('kpiHighestGrade').textContent = bestGrade.toFixed(2);
 
-    const tbody = document.getElementById('gradebookTableBody');
     if (filtered.length === 0) {
         tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:2rem; color:var(--text-muted);">${t('emptyGradebook')}</td></tr>`;
         return;
@@ -3503,18 +3570,22 @@ function exportAllDataJSON() {
  * a los existentes o SOBRESCRIBIR todo
  */
 function promptImportModeModal(onChoice) {
+    const isEn = appState.lang === 'en';
     const overlay = document.createElement('div');
     overlay.className = 'upar-modal-overlay';
     overlay.innerHTML = `
         <div class="upar-modal-box">
             <h3><i class="fa-solid fa-file-import text-indigo"></i> ${t('modalImportTitle')}</h3>
             <p>${t('modalImportDesc')}</p>
-            <div class="upar-modal-actions">
+            <div class="upar-modal-actions" style="flex-wrap:wrap; gap:0.5rem;">
                 <button type="button" class="btn-primary-md" id="btnModalMerge">
                     <i class="fa-solid fa-layer-group"></i> ${t('btnImportMerge')}
                 </button>
-                <button type="button" class="btn-danger-sm" id="btnModalOverwrite">
-                    <i class="fa-solid fa-rotate"></i> ${t('btnImportOverwrite')}
+                <button type="button" class="btn-utility" id="btnModalOverwriteExamsOnly">
+                    <i class="fa-solid fa-file-pen text-indigo"></i> ${isEn ? 'Overwrite exams only (keep grades)' : 'Sobrescribir solo exámenes (conservar notas)'}
+                </button>
+                <button type="button" class="btn-danger-sm" id="btnModalOverwriteAll">
+                    <i class="fa-solid fa-rotate"></i> ${isEn ? 'Overwrite EVERYTHING' : 'Sobrescribir TODO'}
                 </button>
                 <button type="button" class="btn-utility" id="btnModalCancelImport">
                     ${t('btnImportCancel')}
@@ -3528,9 +3599,13 @@ function promptImportModeModal(onChoice) {
         overlay.remove();
         onChoice('merge');
     };
-    overlay.querySelector('#btnModalOverwrite').onclick = () => {
+    overlay.querySelector('#btnModalOverwriteExamsOnly').onclick = () => {
         overlay.remove();
-        onChoice('overwrite');
+        onChoice('overwrite_exams_only');
+    };
+    overlay.querySelector('#btnModalOverwriteAll').onclick = () => {
+        overlay.remove();
+        onChoice('overwrite_all');
     };
     overlay.querySelector('#btnModalCancelImport').onclick = () => {
         overlay.remove();
@@ -3541,15 +3616,28 @@ function applyImportedData(data, mode) {
     const incomingExams = Array.isArray(data.exams)
         ? data.exams
         : (Array.isArray(data) ? data : (data.id && data.answers ? [data] : []));
-    const incomingResults = Array.isArray(data.results) ? data.results : [];
+    const incomingResults = (data && !Array.isArray(data) && Array.isArray(data.results))
+        ? data.results
+        : [];
 
-    if (mode === 'overwrite') {
-        if (incomingExams.length > 0) appState.exams = incomingExams;
-        appState.results = incomingResults;
-        if (appState.exams.length > 0) {
+    if (mode === 'overwrite_all' || mode === 'overwrite') {
+        if (incomingExams.length > 0) {
+            appState.exams = incomingExams;
             appState.activeExam = JSON.parse(JSON.stringify(appState.exams[0]));
         }
+        appState.results = incomingResults;
         showToast(t('toastImportOverwritten'));
+    } else if (mode === 'overwrite_exams_only') {
+        if (incomingExams.length > 0) {
+            appState.exams = incomingExams;
+            appState.activeExam = JSON.parse(JSON.stringify(appState.exams[0]));
+        }
+        // Se conservan appState.results intactos aunque el examen se haya sobreescrito
+        showToast(
+            appState.lang === 'en'
+                ? 'Exams overwritten; existing grades preserved'
+                : 'Exámenes sobreescritos; calificaciones conservadas'
+        );
     } else {
         // Modo SUMAR (Merge): conserva los actuales y agrega/actualiza los del JSON sin borrar nada
         incomingExams.forEach(incEx => {
@@ -3558,11 +3646,13 @@ function applyImportedData(data, mode) {
                 e => e.id === incEx.id || e.title.toLowerCase() === incEx.title.toLowerCase()
             );
             if (existsIdx >= 0) {
-                // Si tiene el mismo nombre pero distinto ID o contenido, lo agregamos como copia o actualizamos
                 if (appState.exams[existsIdx].id === incEx.id) {
                     appState.exams[existsIdx] = incEx;
                 } else {
-                    appState.exams.unshift({ ...incEx, id: 'exam_' + Date.now() + '_' + Math.floor(Math.random() * 1000) });
+                    appState.exams.unshift({
+                        ...incEx,
+                        id: 'exam_' + Date.now() + '_' + Math.floor(Math.random() * 1000)
+                    });
                 }
             } else {
                 appState.exams.unshift(incEx);
@@ -3571,9 +3661,21 @@ function applyImportedData(data, mode) {
 
         incomingResults.forEach(incRes => {
             if (!incRes) return;
-            const already = appState.results.some(r => r.id === incRes.id);
+            const normalizedRes = {
+                ...incRes,
+                id: incRes.id || generateScopedId('res')
+            };
+            const already = appState.results.some(r =>
+                r.id === normalizedRes.id ||
+                (
+                    String(r.studentName || '').trim().toLowerCase() === String(normalizedRes.studentName || '').trim().toLowerCase() &&
+                    String(r.examId || '') === String(normalizedRes.examId || '') &&
+                    String(r.date || '') === String(normalizedRes.date || '') &&
+                    Number(r.grade) === Number(normalizedRes.grade)
+                )
+            );
             if (!already) {
-                appState.results.push(incRes);
+                appState.results.push(normalizedRes);
             }
         });
 
@@ -3766,6 +3868,102 @@ function buildSyncUrl(paramsObj) {
     return `${baseUrl}?${usp.toString()}`;
 }
 
+function openPhoneExamSelectionModal(onConfirmSend) {
+    const isEn = appState.lang === 'en';
+    const examsList = Array.isArray(appState.exams) ? appState.exams : [];
+
+    if (examsList.length === 0) {
+        onConfirmSend([]);
+        return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'upar-modal-overlay no-print';
+    overlay.style.zIndex = '10050';
+
+    const itemsHtml = examsList.map((ex, idx) => {
+        const safeTitle = String(ex.title || 'Examen').replace(/</g, '<').replace(/>/g, '>');
+        const safeCourse = String(ex.course || '').replace(/</g, '<').replace(/>/g, '>');
+        return `
+            <label style="display:flex; align-items:center; justify-content:space-between; gap:0.6rem; padding:0.55rem 0.7rem; background:var(--card-inner); border:1px solid var(--border); border-radius:0.65rem; cursor:pointer; text-align:left;">
+                <span style="display:flex; align-items:center; gap:0.55rem; flex:1;">
+                    <input type="checkbox" class="phone-qr-exam-chk" data-exam-idx="${idx}" checked style="width:16px; height:16px; cursor:pointer;">
+                    <span>
+                        <strong style="display:block; font-size:0.82rem;">${safeTitle}</strong>
+                        <small style="color:var(--text-muted); font-size:0.72rem;">${safeCourse} • ${ex.questionCount || 20} ${t('questionsShort')}</small>
+                    </span>
+                </span>
+            </label>
+        `;
+    }).join('');
+
+    overlay.innerHTML = `
+        <div class="upar-modal-box" style="max-width:460px; width:95%;">
+            <h3><i class="fa-solid fa-list-check text-indigo"></i> ${isEn ? 'Select Exams to Send to PC' : 'Seleccionar Exámenes para Enviar al PC'}</h3>
+            <p style="font-size:0.78rem; margin-bottom:0.6rem;">
+                ${isEn
+                    ? 'All exams are selected by default. Uncheck or select the ones you want to send:'
+                    : 'Todos vienen seleccionados por defecto. Desmarca o elige los que quieras enviar:'}
+            </p>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; margin-bottom:0.65rem;">
+                <button type="button" class="btn-mini" id="btnPhoneToggleAllExams">
+                    <i class="fa-regular fa-square"></i> ${isEn ? 'Deselect all' : 'Deseleccionar todos'}
+                </button>
+                <span id="phoneSelectedExamsCount" class="text-muted-xs" style="font-weight:700;">
+                    ${examsList.length} / ${examsList.length}
+                </span>
+            </div>
+            <div style="max-height:240px; overflow-y:auto; display:flex; flex-direction:column; gap:0.45rem; margin-bottom:0.85rem;">
+                ${itemsHtml}
+            </div>
+            <div class="upar-modal-actions">
+                <button type="button" class="btn-utility" id="btnCancelPhoneExamPick">${t('btnImportCancel')}</button>
+                <button type="button" class="btn-primary-md" id="btnConfirmPhoneExamPick">
+                    <i class="fa-solid fa-paper-plane"></i> ${isEn ? 'Send Selected' : 'Enviar Seleccionados'}
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const checkboxes = Array.from(overlay.querySelectorAll('.phone-qr-exam-chk'));
+    const countEl = overlay.querySelector('#phoneSelectedExamsCount');
+    const btnToggleAll = overlay.querySelector('#btnPhoneToggleAllExams');
+    const btnConfirm = overlay.querySelector('#btnConfirmPhoneExamPick');
+
+    const refreshSelectionState = () => {
+        const checkedCount = checkboxes.filter(c => c.checked).length;
+        countEl.textContent = `${checkedCount} / ${checkboxes.length}`;
+        btnConfirm.disabled = checkedCount === 0;
+        const allChecked = checkedCount === checkboxes.length;
+        btnToggleAll.innerHTML = allChecked
+            ? `<i class="fa-regular fa-square"></i> ${isEn ? 'Deselect all' : 'Deseleccionar todos'}`
+            : `<i class="fa-regular fa-square-check"></i> ${isEn ? 'Select all' : 'Seleccionar todos'}`;
+    };
+
+    checkboxes.forEach(chk => chk.addEventListener('change', refreshSelectionState));
+
+    btnToggleAll.onclick = () => {
+        const allChecked = checkboxes.every(c => c.checked);
+        checkboxes.forEach(c => { c.checked = !allChecked; });
+        refreshSelectionState();
+    };
+
+    overlay.querySelector('#btnCancelPhoneExamPick').onclick = () => {
+        overlay.remove();
+        onConfirmSend(null);
+    };
+
+    btnConfirm.onclick = () => {
+        const chosenExams = checkboxes
+            .filter(c => c.checked)
+            .map(c => examsList[Number(c.dataset.examIdx)])
+            .filter(Boolean);
+        overlay.remove();
+        onConfirmSend(chosenExams);
+    };
+}
+
 /**
  * Conecta con el Peer remoto forzando serialization:'json' y servidores STUN
  * para que funcione entre datos móviles (4.5G) y Wi-Fi sin quedarse en pantalla negra.
@@ -3794,8 +3992,27 @@ function connectAndTransferWithPeer(peerId, mode, statusEl, onDoneCallback) {
 
         conn.on('open', () => {
             if (mode === 'UPAR_P2P_RECEIVE') {
-                if (statusEl) statusEl.innerHTML = `<i class="fa-solid fa-paper-plane text-emerald"></i> ${isEn ? 'Sending data to PC...' : 'Enviando exámenes y calificaciones al PC...'}`;
-                conn.send({ type: 'UPAR_DATA_BUNDLE', payload: getCurrentBundleForSync() });
+                openPhoneExamSelectionModal((selectedExams) => {
+                    if (!Array.isArray(selectedExams)) {
+                        if (statusEl) statusEl.textContent = isEn ? 'Send cancelled.' : 'Envío cancelado.';
+                        return;
+                    }
+                    if (selectedExams.length === 0) {
+                        showToast(isEn ? 'Select at least one exam' : 'Selecciona al menos un examen', 'fa-triangle-exclamation');
+                        return;
+                    }
+                    if (statusEl) {
+                        statusEl.innerHTML = `<i class="fa-solid fa-paper-plane text-emerald"></i> ${isEn ? 'Sending selected exams to PC...' : 'Enviando exámenes seleccionados al PC...'}`;
+                    }
+                    const payloadToSend = {
+                        app: 'UparGrade Studio',
+                        scope: selectedExams.length === 1 ? 'single_exam' : 'selected_exams',
+                        exportedAt: new Date().toISOString(),
+                        exams: JSON.parse(JSON.stringify(selectedExams)),
+                        results: []
+                    };
+                    conn.send({ type: 'UPAR_DATA_BUNDLE', payload: payloadToSend });
+                });
             } else {
                 if (statusEl) statusEl.innerHTML = `<i class="fa-solid fa-download text-indigo"></i> ${isEn ? 'Receiving data from PC...' : 'Recibiendo datos desde el PC...'}`;
                 conn.send({ type: 'UPAR_REQUEST_BUNDLE' });
@@ -3877,6 +4094,116 @@ function processScannedQrText(rawText, statusEl, closeOverlayFn) {
 
     showToast(isEn ? 'Unrecognized QR code' : 'Código QR no reconocido', 'fa-triangle-exclamation');
     return false;
+}
+
+function buildSingleExamSyncPayload(examId) {
+    syncCurrentExamMeta();
+    const targetExam = appState.exams.find(e => e.id === examId);
+    if (!targetExam) return null;
+    return {
+        app: 'UparGrade Studio',
+        scope: 'single_exam',
+        exportedAt: new Date().toISOString(),
+        exams: [JSON.parse(JSON.stringify(targetExam))],
+        results: []
+    };
+}
+
+function buildCompactSingleExamQrParam(examId) {
+    const ex = appState.exams.find(e => e.id === examId);
+    if (!ex) return '';
+    let ansStr = '';
+    for (let i = 1; i <= ex.questionCount; i++) ansStr += (ex.answers[i] || 'A');
+    const compactOne = [[
+        ex.id, ex.title, ex.course, ex.questionCount,
+        ex.optionsCount, ex.maxGrade, ex.minGrade, ansStr,
+        ex.updatedAt || new Date().toISOString().slice(0, 10)
+    ]];
+    const jsonStr = JSON.stringify({ v: 1, scope: 'single_exam', e: compactOne });
+    return btoa(unescape(encodeURIComponent(jsonStr)))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+}
+
+async function openSingleExamQrModal(examId) {
+    const targetExam = appState.exams.find(e => e.id === examId);
+    if (!targetExam) return;
+
+    cleanupQrSyncResources();
+    const isEn = appState.lang === 'en';
+    const singlePayload = buildSingleExamSyncPayload(examId);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'upar-modal-overlay no-print';
+    overlay.innerHTML = `
+        <div class="upar-modal-box" style="max-width: 440px; width: 95%;">
+            <h3><i class="fa-solid fa-qrcode text-indigo"></i> ${isEn ? 'Share Single Exam (QR)' : 'Enviar Solo Este Examen (QR)'}</h3>
+            <p style="margin-bottom:0.75rem; font-size:0.78rem;">
+                <strong>${targetExam.title}</strong> (${targetExam.course})
+            </p>
+            <div id="singleExamQrRenderBox" style="min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                <span class="text-muted-xs">${isEn ? 'Generating QR...' : 'Generando QR...'}</span>
+            </div>
+            <div class="upar-modal-actions" style="margin-top:0.9rem;">
+                <button type="button" class="btn-utility" id="btnCloseSingleExamQr">
+                    ${t('btnImportCancel')}
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const boxEl = overlay.querySelector('#singleExamQrRenderBox');
+    overlay.querySelector('#btnCloseSingleExamQr').onclick = () => {
+        cleanupQrSyncResources();
+        overlay.remove();
+    };
+
+    try {
+        await ensureQrLibs(true);
+        const compactB64 = buildCompactSingleExamQrParam(examId);
+        if (compactB64 && compactB64.length < 1800) {
+            const directUrl = buildSyncUrl({ qrdata: compactB64 });
+            boxEl.innerHTML = `
+                <div id="qrSingleCanvasHost" style="background:#fff; padding:12px; border-radius:0.9rem; border:2px solid var(--border); margin-bottom:0.5rem;"></div>
+                <span class="text-muted-xs">${isEn ? 'Contains only this exam.' : 'Contiene únicamente este examen.'}</span>
+            `;
+            drawQrTextToElement(boxEl.querySelector('#qrSingleCanvasHost'), directUrl);
+            return;
+        }
+
+        const roomId = 'upar_one_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+        qrActivePeer = new window.Peer(roomId, { config: PEER_ICE_CONFIG });
+
+        qrActivePeer.on('open', (id) => {
+            const p2pUrl = buildSyncUrl({ qrpeer: id, qrmode: 'UPAR_P2P_SEND' });
+            boxEl.innerHTML = `
+                <div id="qrSingleCanvasHost" style="background:#fff; padding:12px; border-radius:0.9rem; border:2px solid var(--border); margin-bottom:0.5rem;"></div>
+                <span id="qrSingleStatus" class="text-muted-xs">${isEn ? 'Waiting for phone...' : 'Esperando conexión del celular...'}</span>
+            `;
+            drawQrTextToElement(boxEl.querySelector('#qrSingleCanvasHost'), p2pUrl);
+        });
+
+        qrActivePeer.on('connection', (conn) => {
+            const stEl = boxEl.querySelector('#qrSingleStatus');
+            if (stEl) stEl.textContent = isEn ? 'Sending only this exam...' : 'Enviando únicamente este examen...';
+            const sendSingle = () => {
+                conn.send({ type: 'UPAR_DATA_BUNDLE', payload: singlePayload });
+                setTimeout(() => {
+                    showToast(isEn ? 'Exam sent!' : '¡Examen enviado correctamente!');
+                    cleanupQrSyncResources();
+                    overlay.remove();
+                }, 700);
+            };
+            conn.on('open', sendSingle);
+            conn.on('data', (msg) => {
+                if (msg && msg.type === 'UPAR_REQUEST_BUNDLE') sendSingle();
+            });
+        });
+    } catch (_) {
+        boxEl.innerHTML = `<p class="text-amber">${isEn ? 'Error generating QR.' : 'Error al generar el QR.'}</p>`;
+    }
 }
 
 async function openQrSyncHubModal() {
@@ -4402,6 +4729,7 @@ Object.assign(window, {
     overrideScannedQuestion,
     saveScannedResultToGradebook,
     renderGradebookTable,
+    toggleGradebookSort,
     deleteSingleResult,
     clearGradebookForCurrentExam,
     exportGradebookCSV,
@@ -4411,7 +4739,8 @@ Object.assign(window, {
     goToSavedExamsPage,
     toggleManualCornerEditor,
     applyManualCornersAndRescan,
-    updateBubbleWidthScale
+    updateBubbleWidthScale,
+    openSingleExamQrModal
 });
 
 window.addEventListener('DOMContentLoaded', () => {

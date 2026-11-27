@@ -1475,3 +1475,51 @@ input:focus, select:focus {
     background: var(--accent-soft) !important;
     transition: background 0.15s ease, outline-color 0.15s ease;
 }
+
+.minimal-card .sheet-q-row > span:first-child {
+    font-weight: 900 !important;
+    color: #000000 !important;
+}
+
+.minimal-card .omr-print-bubble {
+    border: 2.2px solid #000000 !important;
+    font-weight: 900 !important;
+    color: #000000 !important;
+}
+
+.minimal-card .omr-print-bubble.teacher-filled {
+    background: #000000 !important;
+    color: #ffffff !important;
+}
+
+.minimal-card .minimal-header-strip,
+.minimal-card .minimal-header-strip span {
+    font-size: 0.95rem !important;
+    font-weight: 900 !important;
+    color: #000000 !important;
+}
+
+.minimal-card .minimal-name-line,
+.minimal-card .minimal-name-line span {
+    font-size: 0.86rem !important;
+    font-weight: 800 !important;
+    color: #000000 !important;
+}
+
+.minimal-card .sheet-q-row > span:first-child {
+    font-size: 0.85rem !important;
+    font-weight: 900 !important;
+    color: #000000 !important;
+}
+
+.minimal-card .omr-print-bubble {
+    font-size: 0.78rem !important;
+    font-weight: 900 !important;
+}
+
+.minimal-card .minimal-name-line .minimal-student-lbl {
+    font-size: 1.05rem !important;
+    font-weight: 900 !important;
+    text-transform: uppercase !important;
+    color: #000000 !important;
+}
